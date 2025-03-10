@@ -27,6 +27,9 @@ export default function HistoryScreen() {
     const minutes = Math.floor(diff / 1000 / 60);
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
+    if (hours === 0) {
+      return `${remainingMinutes}m`;
+    }
     return `${hours}h ${remainingMinutes}m`;
   };
 
@@ -93,45 +96,21 @@ export default function HistoryScreen() {
           return (
             <View key={date.toISOString()} style={styles.dateGroup}>
               <View style={styles.dateHeaderContainer}>
-                <Text style={[styles.dateHeader, isDarkMode && styles.textDark]}>
-                  {formatDate(date)}
-                </Text>
-                {workSession && (
-                  <View style={styles.timeContainer}>
-                    <View style={[styles.timeBox, isDarkMode && styles.timeBoxDark]}>
-                      <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>
-                        In-Time
-                      </Text>
-                      <Text style={[styles.timeValue, isDarkMode && styles.timeValueDark]}>
-                        {formatTime(workSession.clockIn)}
-                      </Text>
-                    </View>
-                    {workSession.clockOut && (
-                      <>
-                        <View style={[styles.timeBox, isDarkMode && styles.timeBoxDark]}>
-                          <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>
-                            Out-Time
-                          </Text>
-                          <Text style={[styles.timeValue, isDarkMode && styles.timeValueDark]}>
-                            {formatTime(workSession.clockOut)}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.timeBox,
-                          styles.durationBox,
-                          isDarkMode && styles.timeBoxDark,
-                          isDarkMode && styles.durationBoxDark
-                        ]}>
-                          <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>
-                            Duration
-                          </Text>
-                          <Text style={[styles.timeValue, styles.durationValue, isDarkMode && styles.durationValueDark]}>
-                            {calculateDuration(workSession.clockIn, workSession.clockOut)}
-                          </Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
+                <View style={styles.dateRow}>
+                  <Text style={[styles.dateHeader, isDarkMode && styles.textDark]}>
+                    {formatDate(date)}
+                  </Text>
+                  {workSession && (
+                    <Text style={[styles.inlineTime, isDarkMode && styles.inlineTimeDark]}>
+                      {formatTime(workSession.clockIn)}
+                      {workSession.clockOut && ` - ${formatTime(workSession.clockOut)}`}
+                    </Text>
+                  )}
+                </View>
+                {workSession?.clockOut && (
+                  <Text style={[styles.totalDuration, isDarkMode && styles.totalDurationDark]}>
+                    Total: {calculateDuration(workSession.clockIn, workSession.clockOut)}
+                  </Text>
                 )}
               </View>
 
@@ -196,21 +175,38 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   dateHeaderContainer: {
-    flexDirection: 'column',
     marginBottom: 12,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   dateHeader: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#2196F3',
   },
-  headerTime: {
+  inlineTime: {
     fontSize: 14,
     color: '#666',
     backgroundColor: '#f5f5f5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  inlineTimeDark: {
+    color: '#aaa',
+    backgroundColor: '#2d2d2d',
+  },
+  totalDuration: {
+    fontSize: 14,
+    color: '#2e7d32',
+    fontWeight: '500',
+  },
+  totalDurationDark: {
+    color: '#66bb6a',
   },
   jobCard: {
     padding: 16,
