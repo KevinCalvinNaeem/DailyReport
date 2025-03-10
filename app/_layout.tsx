@@ -10,12 +10,10 @@ function RootLayoutContent() {
   
   return (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#1a1a1a' : '#fff' }}>
-      <JobProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="index" redirect={true} />
-        </Stack>
-      </JobProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" redirect={true} />
+      </Stack>
     </View>
   );
 }
@@ -24,7 +22,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <RootLayoutContent />
+        <JobProvider>
+          <RootLayoutContent />
+        </JobProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

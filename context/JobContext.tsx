@@ -28,29 +28,25 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [storedJobs, storedSessions] = await Promise.all([
-          AsyncStorage.getItem(JOBS_STORAGE_KEY),
-          AsyncStorage.getItem(WORK_SESSIONS_STORAGE_KEY)
-        ]);
+        const storedJobs = await AsyncStorage.getItem(JOBS_STORAGE_KEY);
+        const storedSessions = await AsyncStorage.getItem(WORK_SESSIONS_STORAGE_KEY);
 
         if (storedJobs) {
           const parsedJobs = JSON.parse(storedJobs);
-          const jobsWithDates = parsedJobs.map((job: any) => ({
+          setJobs(parsedJobs.map((job: any) => ({
             ...job,
             startTime: new Date(job.startTime),
             endTime: job.endTime ? new Date(job.endTime) : null,
-          }));
-          setJobs(jobsWithDates);
+          })));
         }
 
         if (storedSessions) {
           const parsedSessions = JSON.parse(storedSessions);
-          const sessionsWithDates = parsedSessions.map((session: any) => ({
+          setWorkSessions(parsedSessions.map((session: any) => ({
             ...session,
             clockIn: new Date(session.clockIn),
             clockOut: session.clockOut ? new Date(session.clockOut) : null,
-          }));
-          setWorkSessions(sessionsWithDates);
+          })));
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -59,70 +55,61 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, []);
 
-  // Save jobs to storage whenever they change
-  useEffect(() => {
-    const saveJobs = async () => {
-      try {
-        await AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
-      } catch (error) {
-        console.error('Error saving jobs:', error);
-      }
-    };
-    saveJobs();
-  }, [jobs]);
-
-  // Save work sessions to storage whenever they change
-  useEffect(() => {
-    const saveSessions = async () => {
-      try {
-        await AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(workSessions));
-      } catch (error) {
-        console.error('Error saving work sessions:', error);
-      }
-    };
-    saveSessions();
-  }, [workSessions]);
-
   const addJob = (job: Omit<JobEntry, 'id'>) => {
     const newJob: JobEntry = {
       ...job,
       id: Date.now().toString(),
+      startTime: new Date(),
+      endTime: null
     };
-    setJobs(prev => [...prev, newJob]);
-  };
-
-  const endJob = (id: string) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === id ? { ...job, endTime: new Date() } : job
-      )
-    );
+    
+    setJobs(prevJobs => {
+      const updatedJobs = [...prevJobs, newJob];
+      // Save to AsyncStorage
+      AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs.map(j => ({
+        ...j,
+        startTime: j.startTime.toISOString(),
+        endTime: j.endTime ? j.endTime.toISOString() : null
+      }))));
+      return updatedJobs;
+    });
   };
 
   const clockIn = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const existingSession = workSessions.find(session => session.date === today);
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
     
-    if (!existingSession || existingSession.clockOut) {
-      // Either no session exists or the previous session was completed
-      setWorkSessions(prev => [
-        ...prev.filter(session => session.date !== today), // Remove any existing session for today
-        {
-          date: today,
-          clockIn: new Date(),
-          clockOut: null
-        }
-      ]);
-    }
+    setWorkSessions(prev => {
+      const newSession = {
+        date: today,
+        clockIn: now,
+        clockOut: null
+      };
+      const updated = [...prev.filter(s => s.date !== today), newSession];
+      AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(updated.map(s => ({
+        ...s,
+        clockIn: s.clockIn.toISOString(),
+        clockOut: s.clockOut ? s.clockOut.toISOString() : null
+      }))));
+      return updated;
+    });
   };
 
   const clockOut = () => {
-    const today = new Date().toISOString().split('T')[0];
-    setWorkSessions(prev =>
-      prev.map(session =>
-        session.date === today ? { ...session, clockOut: new Date() } : session
-      )
-    );
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    setWorkSessions(prev => {
+      const updated = prev.map(session =>
+        session.date === today ? { ...session, clockOut: now } : session
+      );
+      AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(updated.map(s => ({
+        ...s,
+        clockIn: s.clockIn.toISOString(),
+        clockOut: s.clockOut ? s.clockOut.toISOString() : null
+      }))));
+      return updated;
+    });
   };
 
   const getCurrentWorkSession = () => {
@@ -130,28 +117,46 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
     return workSessions.find(session => session.date === today) || null;
   };
 
-  const getWorkSessionForDate = (date: string) => {
-    return workSessions.find(session => session.date === date) || null;
+  const getActiveJobs = () => jobs.filter(job => !job.endTime);
+  
+  const getCompletedJobs = () => (
+    jobs.filter(job => job.endTime)
+        .sort((a, b) => (b.endTime?.getTime() || 0) - (a.endTime?.getTime() || 0))
+  );
+
+  const endJob = (id: string) => {
+    setJobs(prev => {
+      const updated = prev.map(job =>
+        job.id === id ? { ...job, endTime: new Date() } : job
+      );
+      AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updated.map(j => ({
+        ...j,
+        startTime: j.startTime.toISOString(),
+        endTime: j.endTime ? j.endTime.toISOString() : null
+      }))));
+      return updated;
+    });
   };
 
-  const getActiveJobs = () => jobs.filter(job => !job.endTime);
-  const getCompletedJobs = () => jobs.filter(job => job.endTime).sort((a, b) => 
-    (b.endTime?.getTime() || 0) - (a.endTime?.getTime() || 0)
+  const getWorkSessionForDate = (date: string) => (
+    workSessions.find(session => session.date === date) || null
   );
 
   const clearHistory = () => {
     const activeJobs = jobs.filter(job => !job.endTime);
     setJobs(activeJobs);
     setWorkSessions([]);
+    AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(activeJobs));
+    AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify([]));
   };
 
   return (
-    <JobContext.Provider value={{ 
-      jobs, 
+    <JobContext.Provider value={{
+      jobs,
       workSessions,
-      addJob, 
-      endJob, 
-      getActiveJobs, 
+      addJob,
+      endJob,
+      getActiveJobs,
       getCompletedJobs,
       clockIn,
       clockOut,

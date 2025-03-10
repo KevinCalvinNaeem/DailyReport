@@ -22,13 +22,23 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.workhourstracker.app",
+      "versionCode": 1
     },
     "plugins": [
       "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "da932f6e-199e-498b-8d5f-dba99ceb57d5"
+      }
     }
   }
 }
