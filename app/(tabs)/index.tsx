@@ -6,10 +6,13 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
+import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function ActiveJobsScreen() {
   const { addJob, endJob, getActiveJobs, clockIn, clockOut, getCurrentWorkSession, jobs } = useJobs();
@@ -39,7 +42,6 @@ export default function ActiveJobsScreen() {
       setNewJob({ name: '', description: '' });
       // Force a re-render
       setForceUpdate(prev => prev + 1);
-      Alert.alert('Success', 'New job started!');
     }
   };
 
@@ -49,9 +51,14 @@ export default function ActiveJobsScreen() {
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
-      <View style={[styles.workSessionContainer, isDarkMode && styles.workSessionContainerDark]}>
-        {!currentSession || currentSession.clockOut ? (
-          <>
+      {!currentSession || currentSession.clockOut ? (
+        <View style={styles.welcomeContainer}>
+          <Image 
+            source={require('../../assets/images/Productivity.png')}
+            style={styles.welcomeImage}
+            resizeMode="contain"
+          />
+          <View style={[styles.welcomeCard, isDarkMode && styles.welcomeCardDark]}>
             <Text style={[styles.welcomeTitle, isDarkMode && styles.textDark]}>
               Welcome to DailyReport
             </Text>
@@ -67,77 +74,95 @@ export default function ActiveJobsScreen() {
             >
               <Text style={styles.sessionButtonText}>Start Work Day</Text>
             </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={[styles.sessionButton, styles.endSessionButton]}
-            onPress={() => {
-              clockOut();
-              setForceUpdate(prev => prev + 1);
-            }}
-          >
-            <Text style={styles.sessionButtonText}>End Work Day</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {currentSession && !currentSession.clockOut && (
-        <View style={styles.content}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, isDarkMode && styles.inputDark]}
-              placeholder="Job Name"
-              placeholderTextColor={isDarkMode ? '#888' : '#666'}
-              value={newJob.name}
-              onChangeText={(text) => setNewJob(prev => ({ ...prev, name: text }))}
-            />
-            <TextInput
-              style={[styles.input, isDarkMode && styles.inputDark]}
-              placeholder="Job Description"
-              placeholderTextColor={isDarkMode ? '#888' : '#666'}
-              value={newJob.description}
-              onChangeText={(text) => setNewJob(prev => ({ ...prev, description: text }))}
-              multiline
-            />
-            <TouchableOpacity 
-              style={[styles.startJobButton, isDarkMode && styles.startJobButtonDark]}
-              onPress={startNewJob}
+          </View>
+          <View style={styles.welcomeNavButtons}>
+            <TouchableOpacity
+              style={[styles.navButton, isDarkMode && styles.navButtonDark]}
+              onPress={() => router.push('/history')}
             >
-              <Text style={styles.startJobButtonText}>Start New Job</Text>
+              <MaterialIcons name="history" size={24} color={isDarkMode ? '#fff' : '#2196F3'} />
+              <Text style={[styles.navButtonText, isDarkMode && styles.navButtonTextDark]}>History</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navButton, isDarkMode && styles.navButtonDark]}
+              onPress={() => router.push('/settings')}
+            >
+              <MaterialIcons name="settings" size={24} color={isDarkMode ? '#fff' : '#2196F3'} />
+              <Text style={[styles.navButtonText, isDarkMode && styles.navButtonTextDark]}>Settings</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <>
+          <View style={[styles.workSessionContainer, isDarkMode && styles.workSessionContainerDark]}>
+            <TouchableOpacity
+              style={[styles.sessionButton, styles.endSessionButton]}
+              onPress={() => {
+                clockOut();
+                setForceUpdate(prev => prev + 1);
+              }}
+            >
+              <Text style={styles.sessionButtonText}>End Work Day</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.jobList}>
-            {localJobs.map(job => (
-              <View
-                key={job.id}
-                style={[styles.jobCard, isDarkMode && styles.jobCardDark]}
+          <View style={styles.content}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, isDarkMode && styles.inputDark]}
+                placeholder="Job Name"
+                placeholderTextColor={isDarkMode ? '#888' : '#666'}
+                value={newJob.name}
+                onChangeText={(text) => setNewJob(prev => ({ ...prev, name: text }))}
+              />
+              <TextInput
+                style={[styles.input, isDarkMode && styles.inputDark]}
+                placeholder="Job Description"
+                placeholderTextColor={isDarkMode ? '#888' : '#666'}
+                value={newJob.description}
+                onChangeText={(text) => setNewJob(prev => ({ ...prev, description: text }))}
+                multiline
+              />
+              <TouchableOpacity 
+                style={[styles.startJobButton, isDarkMode && styles.startJobButtonDark]}
+                onPress={startNewJob}
               >
-                <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
-                <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
-                  {job.description}
-                </Text>
-                <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                  Started: {job.startTime.toLocaleTimeString()}
-                </Text>
-                <TouchableOpacity 
-                  style={styles.endButton}
-                  onPress={() => {
-                    endJob(job.id);
-                    setForceUpdate(prev => prev + 1);
-                  }}
+                <Text style={styles.startJobButtonText}>Start New Job</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.jobList}>
+              {localJobs.map(job => (
+                <View
+                  key={job.id}
+                  style={[styles.jobCard, isDarkMode && styles.jobCardDark]}
                 >
-                  <Text style={styles.endButtonText}>End Job</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            {localJobs.length === 0 && (
-              <Text style={[styles.emptyState, isDarkMode && styles.textDark]}>
-                No active jobs
-              </Text>
-            )}
-          </ScrollView>
-        </View>
+                  <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
+                  <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
+                    {job.description}
+                  </Text>
+                  <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
+                    Started: {job.startTime.toLocaleTimeString()}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.endButton}
+                    onPress={() => {
+                      endJob(job.id);
+                      setForceUpdate(prev => prev + 1);
+                    }}
+                  >
+                    <Text style={styles.endButtonText}>End Job</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {localJobs.length === 0 && (
+                <Text style={[styles.emptyState, isDarkMode && styles.textDark]}>
+                  No active jobs
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </>
       )}
     </View>
   );
@@ -275,5 +300,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     color: '#666',
+  },
+  welcomeImage: {
+    width: '90%',
+    height: 300,
+    marginBottom: 24,
+  },
+  welcomeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  welcomeCard: {
+    backgroundColor: '#f5f5f5',
+    padding: 24,
+    borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  welcomeCardDark: {
+    backgroundColor: '#2d2d2d',
+  },
+  welcomeNavButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 16,
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  navButtonDark: {
+    backgroundColor: '#2d2d2d',
+  },
+  navButtonText: {
+    color: '#2196F3',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  navButtonTextDark: {
+    color: '#fff',
   },
 });

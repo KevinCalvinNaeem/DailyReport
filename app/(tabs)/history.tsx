@@ -3,11 +3,23 @@ import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { JobEntry, WorkSession } from '../../types/job';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
 
 export default function HistoryScreen() {
   const { getCompletedJobs, getWorkSessionForDate, clearHistory } = useJobs();
   const { isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const completedJobs = getCompletedJobs();
+  const [expandedDates, setExpandedDates] = useState<string[]>([]);
+
+  const toggleDate = (dateString: string) => {
+    setExpandedDates(prev => 
+      prev.includes(dateString) 
+        ? prev.filter(d => d !== dateString)
+        : [...prev, dateString]
+    );
+  };
 
   const handleClearHistory = () => {
     Alert.alert(
@@ -28,7 +40,7 @@ export default function HistoryScreen() {
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: true
     });
   };
 
@@ -49,7 +61,7 @@ export default function HistoryScreen() {
     const jobsText = jobs.map(job => {
       const startTime = formatTimeForCopy(job.startTime);
       const endTime = job.endTime ? formatTimeForCopy(job.endTime) : 'ongoing';
-      return `${job.name}(${startTime}--${endTime}) ${job.description}`;
+      return `(${startTime}--${endTime}) ${job.name}: ${job.description}`;
     }).join('\n');
 
     const outTime = workSession.clockOut ? formatTimeForCopy(workSession.clockOut) : 'ongoing';
@@ -58,14 +70,14 @@ export default function HistoryScreen() {
       'ongoing';
 
     const textToCopy = 
-      `Date: ${dateStr}\n` +
-      `In-Time: ${inTime}\n` +
-      `${jobsText}\n` +
-      `Out-time: ${outTime}\n` +
+      `Date: ${dateStr}\n\n` +
+      `In-Time: ${inTime}\n\n` +
+      `${jobsText}\n\n` +
+      `Out-time: ${outTime}\n\n` +
       `Total working hours: ${totalHours}`;
 
     Clipboard.setString(textToCopy);
-    Alert.alert('Copied', 'Day details copied to clipboard');
+    //Alert.alert('Copied', 'Day details copied to clipboard');
   };
 
   const calculateDuration = (start: Date, end: Date) => {
@@ -128,7 +140,11 @@ export default function HistoryScreen() {
   const groupedJobs = groupJobsByDate(completedJobs);
 
   return (
-    <View style={[styles.container, isDarkMode && styles.containerDark]}>
+    <View style={[
+      styles.container, 
+      isDarkMode && styles.containerDark,
+      { paddingTop: insets.top, paddingBottom: insets.bottom }
+    ]}>
       {completedJobs.length > 0 && (
         <TouchableOpacity
           style={styles.clearButton}
@@ -142,77 +158,72 @@ export default function HistoryScreen() {
         {groupedJobs.map(({ date, jobs }) => {
           const dateStr = date.toISOString().split('T')[0];
           const workSession = getWorkSessionForDate(dateStr);
-          const isToday = date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+          const isExpanded = expandedDates.includes(dateStr);
           
           return (
             <View key={date.toISOString()} style={styles.dateGroup}>
-              <View style={styles.dateHeaderContainer}>
-                <View style={styles.dateHeaderRow}>
-                  <Text style={[styles.dateHeader, isDarkMode && styles.textDark]}>
+              <TouchableOpacity 
+                style={[styles.dateHeader, isDarkMode && styles.dateHeaderDark]}
+                onPress={() => toggleDate(dateStr)}
+              >
+                <View style={styles.dateHeaderContent}>
+                  <Text style={[styles.dateHeaderText, isDarkMode && styles.textDark]}>
                     {formatDate(date)}
                   </Text>
-                  {workSession && (isToday || workSession.clockOut) && (
-                    <TouchableOpacity 
-                      style={[styles.copyButton, isDarkMode && styles.copyButtonDark]}
-                      onPress={() => copyDayDetails(date, workSession, jobs)}
-                    >
-                      <MaterialIcons 
-                        name="content-copy" 
-                        size={20} 
-                        color={isDarkMode ? '#fff' : '#2196F3'} 
-                      />
-                    </TouchableOpacity>
+                  {workSession?.clockOut && (
+                    <Text style={[styles.totalHours, isDarkMode && styles.totalHoursDark]}>
+                      {calculateDuration(workSession.clockIn, workSession.clockOut)}
+                    </Text>
                   )}
                 </View>
-                {workSession && (
-                  <View style={[styles.timeRow, isDarkMode && styles.timeRowDark]}>
-                    <View style={styles.timeBlock}>
-                      <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>In:</Text>
-                      <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                        {formatTime(workSession.clockIn)}
-                      </Text>
-                    </View>
-                    <View style={styles.timeBlock}>
-                      <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>Out:</Text>
-                      <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                        {workSession.clockOut ? formatTime(workSession.clockOut) : '--:--'}
-                      </Text>
-                    </View>
-                    {workSession.clockOut && (
+                <MaterialIcons 
+                  name={isExpanded ? 'expand-less' : 'expand-more'} 
+                  size={24} 
+                  color={isDarkMode ? '#fff' : '#000'} 
+                />
+              </TouchableOpacity>
+
+              {isExpanded && (
+                <View style={styles.expandedContent}>
+                  {workSession && (
+                    <View style={[styles.timeRow, isDarkMode && styles.timeRowDark]}>
                       <View style={styles.timeBlock}>
-                        <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>
-                          Total:
-                        </Text>
-                        <Text style={[styles.durationText, isDarkMode && styles.durationTextDark]}>
-                          {calculateDuration(workSession.clockIn, workSession.clockOut)}
+                        <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>In:</Text>
+                        <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
+                          {formatTime(workSession.clockIn)}
                         </Text>
                       </View>
-                    )}
-                  </View>
-                )}
-              </View>
+                      <View style={styles.timeBlock}>
+                        <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>Out:</Text>
+                        <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
+                          {workSession.clockOut ? formatTime(workSession.clockOut) : '--:--'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
 
-              {jobs.map(job => (
-                <View key={job.id} style={[styles.jobCard, isDarkMode && styles.jobCardDark]}>
-                  <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
-                  <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
-                    {job.description}
-                  </Text>
-                  <View style={styles.timeInfo}>
-                    <Text style={[styles.jobTimeText, isDarkMode && styles.textDark]}>
-                      Started: {formatTime(job.startTime)}
-                    </Text>
-                    <Text style={[styles.jobTimeText, isDarkMode && styles.textDark]}>
-                      Ended: {job.endTime ? formatTime(job.endTime) : 'In Progress'}
-                    </Text>
-                    {job.endTime && (
-                      <Text style={[styles.duration, isDarkMode && styles.durationDark]}>
-                        Duration: {calculateDuration(job.startTime, job.endTime)}
-                      </Text>
-                    )}
+                  <View style={styles.jobsList}>
+                    {jobs.map(job => (
+                      <View key={job.id} style={[styles.jobCard, isDarkMode && styles.jobCardDark]}>
+                        <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
+                        <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
+                          {job.description}
+                        </Text>
+                        <View style={styles.timeInfo}>
+                          <Text style={[styles.jobTimeText, isDarkMode && styles.textDark]}>
+                            {formatTime(job.startTime)} - {job.endTime ? formatTime(job.endTime) : 'In Progress'}
+                          </Text>
+                          {job.endTime && (
+                            <Text style={[styles.duration, isDarkMode && styles.durationDark]}>
+                              {calculateDuration(job.startTime, job.endTime)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              ))}
+              )}
             </View>
           );
         })}
@@ -252,19 +263,37 @@ const styles = StyleSheet.create({
   dateGroup: {
     marginBottom: 24,
   },
-  dateHeaderContainer: {
-    marginBottom: 12,
+  dateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  dateHeaderRow: {
+  dateHeaderDark: {
+    backgroundColor: '#2d2d2d',
+  },
+  dateHeaderContent: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginRight: 8,
   },
-  dateHeader: {
-    fontSize: 20,
+  dateHeaderText: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#000',
+  },
+  totalHours: {
+    fontSize: 16,
     color: '#2196F3',
+    fontWeight: '500',
+  },
+  totalHoursDark: {
+    color: '#64B5F6',
   },
   timeCard: {
     backgroundColor: '#f5f5f5',
@@ -369,5 +398,11 @@ const styles = StyleSheet.create({
   },
   copyButtonDark: {
     backgroundColor: '#333',
+  },
+  expandedContent: {
+    gap: 16, // Add spacing between time row and jobs list
+  },
+  jobsList: {
+    gap: 8, // Add consistent spacing between job cards
   },
 });

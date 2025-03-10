@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useJobs } from '../../context/JobContext';
 
 export default function SettingsScreen() {
   const { theme, setTheme, isDarkMode } = useTheme();
+  const { getCurrentWorkSession } = useJobs();
+  const insets = useSafeAreaInsets();
 
   const themeOptions = [
     { label: 'Light', value: 'light', icon: 'light-mode' },
@@ -12,8 +16,18 @@ export default function SettingsScreen() {
     { label: 'System', value: 'system', icon: 'smartphone' },
   ] as const;
 
+  const currentSession = getCurrentWorkSession();
+  const isWorkActive = Boolean(currentSession && !currentSession.clockOut);
+
   return (
-    <View style={[styles.container, isDarkMode && styles.containerDark]}>
+    <View style={[
+      styles.container, 
+      isDarkMode && styles.containerDark,
+      {
+        paddingTop: isWorkActive ? 16 : insets.top,
+        paddingBottom: isWorkActive ? 16 : insets.bottom
+      }
+    ]}>
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Theme</Text>
         <View style={styles.themeOptions}>
@@ -45,6 +59,17 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+      <View style={[styles.settingCard, isDarkMode && styles.settingCardDark]}>
+        <Text style={[styles.settingLabel, isDarkMode && styles.textDark]}>
+          Dark Mode
+        </Text>
+        <Switch
+          value={isDarkMode}
+          onValueChange={(value) => setTheme(value ? 'dark' : 'light')}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={isDarkMode ? '#2196F3' : '#f4f3f4'}
+        />
       </View>
     </View>
   );
@@ -101,5 +126,21 @@ const styles = StyleSheet.create({
   themeOptionTextSelected: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  settingCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  settingCardDark: {
+    backgroundColor: '#2d2d2d',
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#000',
   },
 });
