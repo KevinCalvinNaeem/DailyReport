@@ -6,6 +6,8 @@ interface JobContextType {
   jobs: JobEntry[];
   workSessions: WorkSession[];
   addJob: (job: Omit<JobEntry, 'id'>) => void;
+  updateJob: (id: string, updates: Partial<Omit<JobEntry, 'id'>>) => void;
+  updateWorkSession: (id: string, session: Partial<Omit<WorkSession, 'id'>>) => void;
   endJob: (id: string) => void;
   getActiveJobs: () => JobEntry[];
   getCompletedJobs: () => JobEntry[];
@@ -139,6 +141,40 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const updateJob = (id: string, updates: Partial<Omit<JobEntry, 'id'>>) => {
+    setJobs(prev => {
+      const updated = prev.map(job =>
+        job.id === id ? { ...job, ...updates } : job
+      );
+      AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updated.map(j => ({
+        ...j,
+        startTime: j.startTime.toISOString(),
+        endTime: j.endTime ? j.endTime.toISOString() : null
+      }))));
+      return updated;
+    });
+  };
+
+  const updateWorkSession = (id: string, session: Partial<Omit<WorkSession, 'id'>>) => {
+    setWorkSessions(prev => {
+      const updated = prev.map(ws =>
+        ws.date === id ? {
+          ...ws, 
+          ...session,
+          clockIn: session.clockIn instanceof Date ? session.clockIn : new Date(session.clockIn || ws.clockIn),
+          clockOut: session.clockOut instanceof Date ? session.clockOut : 
+                   session.clockOut ? new Date(session.clockOut) : null
+        } : ws
+      );
+      AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(updated.map(s => ({
+        ...s,
+        clockIn: s.clockIn.toISOString(),
+        clockOut: s.clockOut ? s.clockOut.toISOString() : null
+      }))));
+      return updated;
+    });
+  };
+
   const clockIn = () => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
@@ -219,6 +255,8 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
       jobs,
       workSessions,
       addJob,
+      updateJob,
+      updateWorkSession,
       endJob,
       getActiveJobs,
       getCompletedJobs,
@@ -227,6 +265,7 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
       getCurrentWorkSession,
       getWorkSessionForDate,
       clearHistory
+      
     }}>
       {children}
     </JobContext.Provider>

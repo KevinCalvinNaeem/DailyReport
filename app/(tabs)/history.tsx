@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Clipboard } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Clipboard, Modal, TextInput, Platform } from 'react-native';
 import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,11 +7,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
 export default function HistoryScreen() {
-  const { getCompletedJobs, getWorkSessionForDate, clearHistory } = useJobs();
+  const { getCompletedJobs, getWorkSessionForDate, clearHistory, updateJob, updateWorkSession } = useJobs();
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const completedJobs = getCompletedJobs();
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
+  const [editingJob, setEditingJob] = useState<JobEntry | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSession, setEditingSession] = useState<WorkSession | null>(null);
+  const [editInTime, setEditInTime] = useState('');
+  const [editOutTime, setEditOutTime] = useState('');
+  const [showSessionEditModal, setShowSessionEditModal] = useState(false);
 
   const toggleDate = (dateString: string) => {
     setExpandedDates(prev => 
@@ -137,6 +147,78 @@ export default function HistoryScreen() {
       }));
   };
 
+  const formatTimeForInput = (date: Date | null) => {
+    if (!date) return '';
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const parseTimeInput = (timeStr: string, baseDate: Date) => {
+    if (!timeStr) return null;
+    // Parse time in 12-hour format (e.g., "11:30 AM" or "2:45 PM")
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return null;
+
+    let [, hours, minutes, period] = match;
+    let hour = parseInt(hours, 10);
+    const minute = parseInt(minutes, 10);
+
+    // Convert to 24-hour format for internal storage
+    if (period.toLowerCase() === 'pm' && hour !== 12) {
+      hour += 12;
+    } else if (period.toLowerCase() === 'am' && hour === 12) {
+      hour = 0;
+    }
+
+    const newDate = new Date(baseDate);
+    newDate.setHours(hour, minute);
+    return newDate;
+  };
+
+  const handleEditJob = (job: JobEntry) => {
+    setEditingJob(job);
+    setEditName(job.name);
+    setEditDescription(job.description);
+    setEditStartTime(formatTimeForInput(job.startTime));
+    setEditEndTime(job.endTime ? formatTimeForInput(job.endTime) : '');
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingJob && editName.trim() && editDescription.trim()) {
+      const baseDate = editingJob.startTime;
+      const newStartTime = parseTimeInput(editStartTime, baseDate);
+      const newEndTime = editEndTime ? parseTimeInput(editEndTime, baseDate) : null;
+
+      if (!newStartTime || (editEndTime && !newEndTime)) {
+        Alert.alert('Invalid Time', 'Please enter valid times in 24-hour format (HH:mm)');
+        return;
+      }
+
+      if (newEndTime && newStartTime > newEndTime) {
+        Alert.alert('Invalid Time Range', 'Start time must be before end time');
+        return;
+      }
+
+      updateJob(editingJob.id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+        startTime: newStartTime,
+        endTime: newEndTime
+      });
+      setShowEditModal(false);
+      setEditingJob(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingJob(null);
+  };
+
   const groupedJobs = groupJobsByDate(completedJobs);
 
   return (
@@ -170,17 +252,31 @@ export default function HistoryScreen() {
                   <Text style={[styles.dateHeaderText, isDarkMode && styles.textDark]}>
                     {formatDate(date)}
                   </Text>
-                  {workSession?.clockOut && (
-                    <Text style={[styles.totalHours, isDarkMode && styles.totalHoursDark]}>
-                      {calculateDuration(workSession.clockIn, workSession.clockOut)}
-                    </Text>
-                  )}
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    {workSession?.clockOut && (
+                      <Text style={[styles.totalHours, isDarkMode && styles.totalHoursDark]}>
+                        {calculateDuration(workSession.clockIn, workSession.clockOut)}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.actionButton, isDarkMode && styles.actionButtonDark, {marginLeft: 8}]}
+                      onPress={() => copyDayDetails(date, workSession, jobs)}
+                    >
+                      <MaterialIcons 
+                        name="content-copy" 
+                        size={20} 
+                        color={isDarkMode ? '#fff' : '#666'} 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <MaterialIcons 
-                  name={isExpanded ? 'expand-less' : 'expand-more'} 
-                  size={24} 
-                  color={isDarkMode ? '#fff' : '#000'} 
-                />
+                <View style={styles.dateHeaderActions}>
+                  <MaterialIcons 
+                    name={isExpanded ? 'expand-less' : 'expand-more'} 
+                    size={24} 
+                    color={isDarkMode ? '#fff' : '#000'} 
+                  />
+                </View>
               </TouchableOpacity>
 
               {isExpanded && (
@@ -188,36 +284,70 @@ export default function HistoryScreen() {
                   {workSession && (
                     <View style={[styles.timeRow, isDarkMode && styles.timeRowDark]}>
                       <View style={styles.timeBlock}>
-                        <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>In:</Text>
+                        {/* <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>In:</Text> */}
                         <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                          {formatTime(workSession.clockIn)}
+                          In: {formatTime(workSession.clockIn)}
                         </Text>
                       </View>
                       <View style={styles.timeBlock}>
-                        <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>Out:</Text>
+                        {/* <Text style={[styles.timeLabel, isDarkMode && styles.timeLabelDark]}>Out:</Text> */}
                         <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                          {workSession.clockOut ? formatTime(workSession.clockOut) : '--:--'}
+                        Out: {workSession.clockOut ? formatTime(workSession.clockOut) : '--:--'}
                         </Text>
                       </View>
+                  
+
+                   <TouchableOpacity
+                              style={[styles.actionButton, isDarkMode && styles.actionButtonDark]}
+                              onPress={() => {
+                                setEditingSession(workSession);
+                                setEditInTime(formatTimeForInput(workSession.clockIn));
+                                setEditOutTime(workSession.clockOut ? formatTimeForInput(workSession.clockOut) : '');
+                                setShowSessionEditModal(true);
+                              }}
+                            >
+                              <MaterialIcons 
+                                name="edit" 
+                                size={20} 
+                                color={isDarkMode ? '#fff' : '#666'} 
+                              />
+                            </TouchableOpacity>
                     </View>
                   )}
 
                   <View style={styles.jobsList}>
                     {jobs.map(job => (
                       <View key={job.id} style={[styles.jobCard, isDarkMode && styles.jobCardDark]}>
-                        <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
-                        <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
-                          {job.description}
-                        </Text>
-                        <View style={styles.timeInfo}>
-                          <Text style={[styles.jobTimeText, isDarkMode && styles.textDark]}>
-                            {formatTime(job.startTime)} - {job.endTime ? formatTime(job.endTime) : 'In Progress'}
-                          </Text>
-                          {job.endTime && (
-                            <Text style={[styles.duration, isDarkMode && styles.durationDark]}>
-                              {calculateDuration(job.startTime, job.endTime)}
+                        <View style={styles.jobCardHeader}>
+                          <View style={styles.jobCardContent}>
+                            <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
+                            <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
+                              {job.description}
                             </Text>
-                          )}
+                            <View style={styles.timeInfo}>
+                              <Text style={[styles.jobTimeText, isDarkMode && styles.textDark]}>
+                                {formatTime(job.startTime)} - {job.endTime ? formatTime(job.endTime) : 'In Progress'}
+                              </Text>
+                              {job.endTime && (
+                                <Text style={[styles.duration, isDarkMode && styles.durationDark]}>
+                                  {calculateDuration(job.startTime, job.endTime)}
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                          <View style={styles.actionButtons}>
+                            
+                            <TouchableOpacity
+                              style={[styles.actionButton, isDarkMode && styles.actionButtonDark]}
+                              onPress={() => handleEditJob(job)}
+                            >
+                              <MaterialIcons 
+                                name="edit" 
+                                size={20} 
+                                color={isDarkMode ? '#fff' : '#666'} 
+                              />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     ))}
@@ -233,6 +363,141 @@ export default function HistoryScreen() {
           </Text>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
+            <Text style={[styles.modalTitle, isDarkMode && styles.textDark]}>Edit Job</Text>
+            
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>Job Name</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Enter job name"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+            />
+
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>Description</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Enter job description"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+              multiline
+            />
+
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>Start Time (12h format)</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editStartTime}
+              onChangeText={setEditStartTime}
+              placeholder="hh:mm AM/PM"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+            />
+
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>End Time (12h format)</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editEndTime}
+              onChangeText={setEditEndTime}
+              placeholder="hh:mm AM/PM"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancelEdit}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showSessionEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSessionEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
+            <Text style={[styles.modalTitle, isDarkMode && styles.textDark]}>Edit Work Session</Text>
+            
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>In Time (12h format)</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editInTime}
+              onChangeText={setEditInTime}
+              placeholder="hh:mm AM/PM"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+            />
+
+            <Text style={[styles.inputLabel, isDarkMode && styles.textDark]}>Out Time (12h format)</Text>
+            <TextInput
+              style={[styles.input, isDarkMode && styles.inputDark]}
+              value={editOutTime}
+              onChangeText={setEditOutTime}
+              placeholder="hh:mm AM/PM"
+              placeholderTextColor={isDarkMode ? '#888' : '#666'}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowSessionEditModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={() => {
+                  if (editingSession) {
+                    const baseDate = editingSession.clockIn;
+                    const newInTime = parseTimeInput(editInTime, baseDate);
+                    const newOutTime = editOutTime ? parseTimeInput(editOutTime, baseDate) : null;
+
+                    if (!newInTime || (editOutTime && !newOutTime)) {
+                      Alert.alert('Invalid Time', 'Please enter valid times in 12-hour format (hh:mm AM/PM)');
+                      return;
+                    }
+
+                    if (newOutTime && newInTime > newOutTime) {
+                      Alert.alert('Invalid Time Range', 'In time must be before out time');
+                      return;
+                    }
+
+                    updateWorkSession(editingSession.date, {
+                      clockIn: newInTime,
+                      clockOut: newOutTime
+                    });
+                    
+                    setShowSessionEditModal(false);
+                    setEditingSession(null);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -309,7 +574,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 12,
-    marginTop: 8,
+    marginTop: 2,
     gap: 16,
   },
   timeRowDark: {
@@ -321,15 +586,17 @@ const styles = StyleSheet.create({
   timeLabel: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 0,
+    marginTop:5
   },
   timeLabelDark: {
     color: '#aaa',
   },
   timeText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '500',
     color: '#333',
+    marginTop:6
   },
   jobTimeText: {
     color: '#333',
@@ -344,7 +611,7 @@ const styles = StyleSheet.create({
     color: '#66bb6a',
   },
   timeInfo: {
-    gap: 4,
+    gap: 2,
   },
   duration: {
     color: '#2196F3',
@@ -404,5 +671,106 @@ const styles = StyleSheet.create({
   },
   jobsList: {
     gap: 8, // Add consistent spacing between job cards
+  },
+  jobCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  jobCardContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  editButtonDark: {
+    backgroundColor: '#333',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalContentDark: {
+    backgroundColor: '#2d2d2d',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  inputDark: {
+    borderColor: '#444',
+    backgroundColor: '#1a1a1a',
+    color: '#fff',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#ff4444',
+  },
+  saveButton: {
+    backgroundColor: '#2196F3',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  actionButtonDark: {
+    backgroundColor: '#333',
+  },
+  dateHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

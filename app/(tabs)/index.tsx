@@ -7,12 +7,75 @@ import {
   ScrollView, 
   TouchableOpacity,
   Alert,
-  Image
+  Image,
+  Platform
 } from 'react-native';
 import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+
+// Format time helper functions
+const formatTime = (date: Date) => {
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
+const formatDate = (date: Date) => {
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
+
+const calculateTotalHours = (clockIn: Date, clockOut: Date) => {
+  const diff = clockOut.getTime() - clockIn.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${minutes}m`;
+};
+
+// Format work duration for display and copying
+const formatWorkDuration = (clockIn: Date, clockOut: Date | null, jobs: any[]) => {
+  if (!clockOut) return 'Work in progress...';
+  
+  const date = formatDate(clockIn);
+  const inTime = formatTime(clockIn);
+  const outTime = formatTime(clockOut);
+  
+  let text = `Date: ${date}\n\n`;
+  text += `In-Time: ${inTime}\n\n`;
+  
+  // Format completed jobs
+  const completedJobs = jobs.filter(job => job.endTime && 
+    job.startTime >= clockIn && 
+    job.endTime <= clockOut
+  ).sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  
+  completedJobs.forEach(job => {
+    text += `(${formatTime(job.startTime)}--${formatTime(job.endTime)}) ${job.name}: ${job.description}\n`;
+  });
+  
+  text += `\nOut-time: ${outTime}\n\n`;
+  text += `Total working hours: ${calculateTotalHours(clockIn, clockOut)}`;
+  
+  return text;
+};
+
+// Copy text helper function
+const copyToClipboard = async (text: string) => {
+  try {
+    await Clipboard.setStringAsync(text);
+    Alert.alert('Success', 'Work duration copied to clipboard!');
+  } catch (error) {
+    Alert.alert('Error', 'Failed to copy to clipboard');
+  }
+};
 
 export default function ActiveJobsScreen() {
   const { addJob, endJob, getActiveJobs, clockIn, clockOut, getCurrentWorkSession, jobs } = useJobs();
@@ -42,6 +105,13 @@ export default function ActiveJobsScreen() {
       setNewJob({ name: '', description: '' });
       // Force a re-render
       setForceUpdate(prev => prev + 1);
+    }
+  };
+
+  const copyWorkTime = () => {
+    if (currentSession?.clockOut) {
+      const timeText = formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs);
+      copyToClipboard(timeText);
     }
   };
 
@@ -96,6 +166,24 @@ export default function ActiveJobsScreen() {
         <>
           <View style={[styles.workSessionContainer, isDarkMode && styles.workSessionContainerDark]}>
             <TouchableOpacity
+              style={styles.workDurationContainer}
+              onPress={() => {
+                if (currentSession?.clockOut) {
+                  const timeText = formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs);
+                  copyToClipboard(timeText);
+                }
+              }}
+            >
+              <Text style={[styles.workDurationText, isDarkMode && styles.textDark]}>
+                {currentSession ? formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs) : 'No active session'}
+              </Text>
+              <MaterialIcons 
+                name="content-copy" 
+                size={20} 
+                color={isDarkMode ? '#fff' : '#666'} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.sessionButton, styles.endSessionButton]}
               onPress={() => {
                 clockOut();
@@ -142,7 +230,7 @@ export default function ActiveJobsScreen() {
                     {job.description}
                   </Text>
                   <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
-                    Started: {job.startTime.toLocaleTimeString()}
+                    Started: {formatTime(job.startTime)}
                   </Text>
                   <TouchableOpacity 
                     style={styles.endButton}
@@ -352,5 +440,34 @@ const styles = StyleSheet.create({
   },
   navButtonTextDark: {
     color: '#fff',
+  },
+  workTimeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    marginBottom: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 6,
+  },
+  workTimeText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginRight: 8,
+    color: '#000',
+  },
+  workDurationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    marginBottom: 12,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  workDurationText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
   },
 });
