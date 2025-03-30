@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   dateGroup: {
-    marginBottom: 24,
+    marginBottom: 1,
   },
   dateHeader: {
     flexDirection: 'row',
@@ -667,10 +667,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
   },
   expandedContent: {
-    gap: 16, // Add spacing between time row and jobs list
+    gap: 7, // Add spacing between time row and jobs list
   },
   jobsList: {
-    gap: 8, // Add consistent spacing between job cards
+    gap: 1, // Add consistent spacing between job cards
   },
   jobCardHeader: {
     flexDirection: 'row',
