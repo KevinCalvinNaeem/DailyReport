@@ -1,10 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Clipboard, Modal, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Clipboard, Modal, TextInput, Platform, Animated } from 'react-native';
 import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { JobEntry, WorkSession } from '../../types/job';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export default function HistoryScreen() {
   const { getCompletedJobs, getWorkSessionForDate, clearHistory, updateJob, updateWorkSession } = useJobs();
@@ -12,6 +12,8 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const completedJobs = getCompletedJobs();
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
   const [editingJob, setEditingJob] = useState<JobEntry | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -24,11 +26,41 @@ export default function HistoryScreen() {
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
 
   const toggleDate = (dateString: string) => {
-    setExpandedDates(prev => 
-      prev.includes(dateString) 
-        ? prev.filter(d => d !== dateString)
-        : [...prev, dateString]
-    );
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setExpandedDates(prev => 
+        prev.includes(dateString) 
+          ? prev.filter(d => d !== dateString)
+          : [...prev, dateString]
+      );
+      
+      if (!expandedDates.includes(dateString)) {
+        fadeAnim.setValue(0);
+        slideAnim.setValue(0);
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    });
   };
 
   const handleClearHistory = () => {
@@ -68,7 +100,7 @@ export default function HistoryScreen() {
     const dateStr = formatDateForCopy(date);
     const inTime = formatTimeForCopy(workSession.clockIn);
     
-    const jobsText = jobs.map(job => {
+    const jobsText = jobs.sort((a, b) => a.startTime.getTime() - b.startTime.getTime()).map(job => {
       const startTime = formatTimeForCopy(job.startTime);
       const endTime = job.endTime ? formatTimeForCopy(job.endTime) : 'ongoing';
       return `(${startTime}--${endTime}) ${job.name}: ${job.description}`;
@@ -143,7 +175,7 @@ export default function HistoryScreen() {
       .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
       .map(([date, jobs]) => ({
         date: new Date(date + 'T00:00:00.000Z'),
-        jobs
+        jobs: jobs.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
       }));
   };
 
@@ -280,7 +312,20 @@ export default function HistoryScreen() {
               </TouchableOpacity>
 
               {isExpanded && (
-                <View style={styles.expandedContent}>
+                <Animated.View 
+                  style={[
+                    styles.expandedContent,
+                    {
+                      opacity: fadeAnim,
+                      transform: [{
+                        translateY: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 0]
+                        })
+                      }]
+                    }
+                  ]}
+                >
                   {workSession && (
                     <View style={[styles.timeRow, isDarkMode && styles.timeRowDark]}>
                       <View style={styles.timeBlock}>
@@ -352,7 +397,7 @@ export default function HistoryScreen() {
                       </View>
                     ))}
                   </View>
-                </View>
+                </Animated.View>
               )}
             </View>
           );
@@ -484,9 +529,8 @@ export default function HistoryScreen() {
 
                     updateWorkSession(editingSession.date, {
                       clockIn: newInTime,
-                      clockOut: newOutTime
+                      clockOut: newOutTime,
                     });
-                    
                     setShowSessionEditModal(false);
                     setEditingSession(null);
                   }
@@ -668,6 +712,7 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     gap: 7, // Add spacing between time row and jobs list
+    opacity: 0,
   },
   jobsList: {
     gap: 1, // Add consistent spacing between job cards

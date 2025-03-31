@@ -7,7 +7,15 @@ export interface JobEntry {
 }
 
 export interface WorkSession {
-    date: string; // ISO date string (YYYY-MM-DD)
-    clockIn: Date;
-    clockOut: Date | null;
+  id: string;
+  date: string;
+  clockIn: Date;
+  clockOut: Date | null;
+}
+
+export interface WorkSessionModalState {
+  showSessionEditModal: boolean;
+  editingSession: WorkSession | null;
+  editInTime: string;
+  editOutTime: string;
 }
