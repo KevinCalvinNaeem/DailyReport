@@ -29,12 +29,12 @@ export default function HistoryScreen() {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 100,
         useNativeDriver: true,
       }),
     ]).start(() => {
