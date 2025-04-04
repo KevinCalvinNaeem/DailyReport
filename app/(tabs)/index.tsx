@@ -129,6 +129,9 @@ export default function ActiveJobsScreen() {
             resizeMode="contain"
           />
           <View style={[styles.welcomeCard, isDarkMode && styles.welcomeCardDark]}>
+            <Text style={[styles.copyrightText, isDarkMode && styles.textDark]}>
+              © 2025 DailyReport | Created by Kevin Calvin Naeem
+            </Text>
             <Text style={[styles.welcomeTitle, isDarkMode && styles.textDark]}>
               Welcome to DailyReport
             </Text>
@@ -375,6 +378,12 @@ const styles = StyleSheet.create({
     marginTop: 40,
     color: '#666',
     fontSize: 16,
+  },
+  copyrightText: {
+    fontSize: 9,
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#666',
   },
   welcomeTitle: {
     fontSize: 24,

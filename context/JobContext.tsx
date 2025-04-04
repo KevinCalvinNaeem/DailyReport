@@ -29,58 +29,6 @@ const createPastDate = (daysAgo: number, hours: number, minutes: number) => {
   return date;
 };
 
-const generateSampleData = () => ({
-  jobs: [
-    {
-      id: '1',
-      name: 'Website Development',
-      description: 'Built landing page and contact form',
-      startTime: createPastDate(2, 10, 30),
-      endTime: createPastDate(2, 12, 45),
-    },
-    {
-      id: '2',
-      name: 'API Integration',
-      description: 'Integrated payment gateway API',
-      startTime: createPastDate(2, 14, 0),
-      endTime: createPastDate(2, 17, 30),
-    },
-    {
-      id: '3',
-      name: 'Bug Fixes',
-      description: 'Fixed responsive design issues',
-      startTime: createPastDate(1, 9, 15),
-      endTime: createPastDate(1, 11, 45),
-    },
-    {
-      id: '4',
-      name: 'Client Meeting',
-      description: 'Project progress review',
-      startTime: createPastDate(1, 13, 0),
-      endTime: createPastDate(1, 14, 30),
-    },
-    {
-      id: '5',
-      name: 'Documentation',
-      description: 'Updated API documentation',
-      startTime: createPastDate(1, 15, 0),
-      endTime: createPastDate(1, 17, 0),
-    }
-  ],
-  workSessions: [
-    {
-      date: createPastDate(2, 0, 0).toISOString().split('T')[0],
-      clockIn: createPastDate(2, 10, 0),
-      clockOut: createPastDate(2, 18, 0),
-    },
-    {
-      date: createPastDate(1, 0, 0).toISOString().split('T')[0],
-      clockIn: createPastDate(1, 9, 0),
-      clockOut: createPastDate(1, 17, 30),
-    }
-  ]
-});
-
 export function JobProvider({ children }: { children: React.ReactNode }) {
   const [jobs, setJobs] = useState<JobEntry[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
@@ -89,30 +37,24 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Clear existing storage to force sample data
-        await AsyncStorage.clear();
-
-        const sampleData = generateSampleData();
+        const jobsData = await AsyncStorage.getItem(JOBS_STORAGE_KEY);
+        const sessionsData = await AsyncStorage.getItem(WORK_SESSIONS_STORAGE_KEY);
         
-        // Set jobs with sample data
-        setJobs(sampleData.jobs);
-        await AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(
-          sampleData.jobs.map(j => ({
+        if (jobsData) {
+          setJobs(JSON.parse(jobsData).map((j: any) => ({
             ...j,
-            startTime: j.startTime.toISOString(),
-            endTime: j.endTime?.toISOString()
-          }))
-        ));
-
-        // Set work sessions with sample data
-        setWorkSessions(sampleData.workSessions);
-        await AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(
-          sampleData.workSessions.map(s => ({
+            startTime: new Date(j.startTime),
+            endTime: j.endTime ? new Date(j.endTime) : null
+          })));
+        }
+        
+        if (sessionsData) {
+          setWorkSessions(JSON.parse(sessionsData).map((s: any) => ({
             ...s,
-            clockIn: s.clockIn.toISOString(),
-            clockOut: s.clockOut?.toISOString()
-          }))
-        ));
+            clockIn: new Date(s.clockIn),
+            clockOut: s.clockOut ? new Date(s.clockOut) : null
+          })));
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       }
