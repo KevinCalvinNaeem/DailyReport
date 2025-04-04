@@ -85,9 +85,27 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
 
   const updateJob = (id: string, updates: Partial<Omit<JobEntry, 'id'>>) => {
     setJobs(prev => {
-      const updated = prev.map(job =>
-        job.id === id ? { ...job, ...updates } : job
-      );
+      // Check if job with this id exists
+      const jobExists = prev.some(job => job.id === id);
+      let updated;
+      
+      if (jobExists) {
+        // Update existing job
+        updated = prev.map(job =>
+          job.id === id ? { ...job, ...updates } : job
+        );
+      } else {
+        // Add new job with the provided id
+        const newJob: JobEntry = {
+          id,
+          name: updates.name || '',
+          description: updates.description || '',
+          startTime: updates.startTime || new Date(),
+          endTime: updates.endTime || null
+        };
+        updated = [...prev, newJob];
+      }
+      
       AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updated.map(j => ({
         ...j,
         startTime: j.startTime.toISOString(),
@@ -99,15 +117,33 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
 
   const updateWorkSession = (id: string, session: Partial<Omit<WorkSession, 'id'>>) => {
     setWorkSessions(prev => {
-      const updated = prev.map(ws =>
-        ws.date === id ? {
-          ...ws, 
-          ...session,
-          clockIn: session.clockIn instanceof Date ? session.clockIn : new Date(session.clockIn || ws.clockIn),
+      // Check if session with this date exists
+      const sessionExists = prev.some(ws => ws.date === id);
+      let updated;
+      
+      if (sessionExists) {
+        // Update existing session
+        updated = prev.map(ws =>
+          ws.date === id ? {
+            ...ws, 
+            ...session,
+            clockIn: session.clockIn instanceof Date ? session.clockIn : new Date(session.clockIn || ws.clockIn),
+            clockOut: session.clockOut instanceof Date ? session.clockOut : 
+                     session.clockOut ? new Date(session.clockOut) : null
+          } : ws
+        );
+      } else {
+        // Add new session with the provided date
+        const newSession: WorkSession = {
+          id: id, // For WorkSession, id is the date
+          date: id,
+          clockIn: session.clockIn instanceof Date ? session.clockIn : new Date(session.clockIn || new Date()),
           clockOut: session.clockOut instanceof Date ? session.clockOut : 
                    session.clockOut ? new Date(session.clockOut) : null
-        } : ws
-      );
+        };
+        updated = [...prev, newSession];
+      }
+      
       AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(updated.map(s => ({
         ...s,
         clockIn: s.clockIn.toISOString(),
