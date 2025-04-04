@@ -152,9 +152,9 @@ export default function HistoryScreen() {
       return 'Yesterday';
     }
     return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
+      weekday: 'short', // Changed from 'long' to 'short' to show abbreviated day names (Mon, Tue, etc.)
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
