@@ -4,24 +4,24 @@
     "slug": "work-hours-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/DailyReportIcon.png",
+    "icon": "./assets/images/auelogowhite.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/DailyReportIcon.png",
+      "image": "./assets/images/auelogowhite.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F9FAF9"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/images/DailyReportIcon.png"
+      "icon": "./assets/images/auelogowhite.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/DailyReportIcon.png",
+        "foregroundImage": "./assets/images/auelogowhite.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.workhourstracker.app",
@@ -33,7 +33,7 @@
       "barStyle": "dark-content"
     },
     "androidNavigationBar": {
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#090a0a",
       "barStyle": "dark-content"
     },
     "plugins": [

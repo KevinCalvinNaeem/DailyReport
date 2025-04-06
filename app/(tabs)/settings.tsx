@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   containerDark: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#090A0A',
   },
   section: {
     marginBottom: 24,

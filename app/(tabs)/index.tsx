@@ -124,7 +124,9 @@ export default function ActiveJobsScreen() {
       {!currentSession || currentSession.clockOut ? (
         <View style={styles.welcomeContainer}>
           <Image 
-            source={require('../../assets/images/Productivity.png')}
+            source={isDarkMode 
+              ? require('../../assets/images/auelogo.png') 
+              : require('../../assets/images/auelogowhite.png')}
             style={styles.welcomeImage}
             resizeMode="contain"
           />
@@ -262,17 +264,17 @@ export default function ActiveJobsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAF9',
     padding: 16,
   },
   containerDark: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#090a0a',
   },
   content: {
     flex: 1,
   },
   workSessionContainer: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#C7C7C7',
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
@@ -432,7 +434,7 @@ const styles = StyleSheet.create({
   navButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#D7D7D7',
     padding: 12,
     borderRadius: 8,
     gap: 8,

@@ -16,12 +16,12 @@ export default function TabLayout() {
 
   return (
     <>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={isDarkMode ? '#1a1a1a' : '#fff'} />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={isDarkMode ? '#090a0a' : '#F9FAF9'} />
       <Tabs screenOptions={{
         tabBarStyle: {
           ...(!isWorkActive && { display: 'none' }),
           backgroundColor: isDarkMode ? '#1a1a1a' : '#fff',
-          borderTopColor: isDarkMode ? '#333' : '#e0e0e0',
+          borderTopColor: isDarkMode ? '#090a0a' : '#e0e0e0',
           height: Platform.OS === 'ios' ? 85 : 65,
           paddingBottom: Math.max(insets.bottom + 8, Platform.OS === 'ios' ? 28 : 12),
           paddingTop: 8,

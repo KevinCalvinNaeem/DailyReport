@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   containerDark: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#090A0A',
   },
   scrollContainer: {
     flex: 1,
