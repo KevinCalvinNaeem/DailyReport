@@ -679,6 +679,9 @@ const styles = StyleSheet.create({
   jobsList: {
     paddingBottom: 20,
   },
+  expandedContent: {
+    paddingTop: 8,
+  },
   timeBlock: {
     flex: 1,
   },

@@ -86,7 +86,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to export history: ' + error.message);
+      Alert.alert('Error', 'Failed to export history: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -244,7 +244,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('Import error:', error);
-      Alert.alert('Error', 'Failed to import history: ' + error.message);
+      Alert.alert('Error', 'Failed to import history: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
