@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 export default function TabLayout() {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, colors } = useTheme();
   const { getCurrentWorkSession } = useJobs();
   const insets = useSafeAreaInsets();
   
@@ -16,22 +16,32 @@ export default function TabLayout() {
 
   return (
     <>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={isDarkMode ? '#090a0a' : '#F9FAF9'} />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} backgroundColor={colors.background} />
       <Tabs screenOptions={{
         tabBarStyle: {
           ...(!isWorkActive && { display: 'none' }),
-          backgroundColor: isDarkMode ? '#1a1a1a' : '#fff',
-          borderTopColor: isDarkMode ? '#090a0a' : '#e0e0e0',
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.tabBarBorder,
           height: Platform.OS === 'ios' ? 85 : 65,
           paddingBottom: Math.max(insets.bottom + 8, Platform.OS === 'ios' ? 28 : 12),
           paddingTop: 8,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 8,
         },
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: isDarkMode ? '#888' : '#666',
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         headerStyle: {
-          backgroundColor: isDarkMode ? '#1a1a1a' : '#fff',
+          backgroundColor: colors.surface,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
         },
-        headerTintColor: isDarkMode ? '#fff' : '#000',
+        headerTintColor: colors.text,
         headerShown: isWorkActive,
       }}>
         <Tabs.Screen

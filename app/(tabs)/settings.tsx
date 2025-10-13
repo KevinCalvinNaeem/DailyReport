@@ -1,15 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useJobs } from '../../context/JobContext';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 
+
 export default function SettingsScreen() {
-  const { theme, setTheme, isDarkMode } = useTheme();
+  const { theme, setTheme, isDarkMode, colors } = useTheme();
   const { jobs, workSessions, getCurrentWorkSession, updateJob, updateWorkSession } = useJobs();
   const insets = useSafeAreaInsets();
 
@@ -46,15 +47,46 @@ export default function SettingsScreen() {
         ])
       ].map(row => row.join(',')).join('\n');
 
-      const fileUri = FileSystem.documentDirectory + 'work_history.csv';
+      // Create a unique filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const filename = `work_history_${timestamp}.csv`;
+      
+      // Try to save to a more accessible location
+      let fileUri;
+      if (Platform.OS === 'android') {
+        // For Android, try to save to the Downloads directory
+        const downloadDir = FileSystem.documentDirectory + '../Downloads/';
+        try {
+          await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+          fileUri = downloadDir + filename;
+        } catch {
+          // Fallback to document directory if Downloads is not accessible
+          fileUri = FileSystem.documentDirectory + filename;
+        }
+      } else {
+        // For iOS, use document directory
+        fileUri = FileSystem.documentDirectory + filename;
+      }
+      
+      // Write the file
       await FileSystem.writeAsStringAsync(fileUri, csvData);
-      await Sharing.shareAsync(fileUri, {
-        UTI: 'public.comma-separated-values-text',
-        mimeType: 'text/csv'
-      });
+
+      // Share the file directly
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          UTI: 'public.comma-separated-values-text',
+          mimeType: 'text/csv',
+          dialogTitle: 'Save Work History'
+        });
+      } else {
+        Alert.alert(
+          'Export Successful', 
+          `Work history has been saved as "${filename}"`
+        );
+      }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to export history');
+      Alert.alert('Error', 'Failed to export history: ' + error.message);
     }
   };
 
@@ -219,67 +251,73 @@ export default function SettingsScreen() {
   return (
     <View style={[
       styles.container, 
-      isDarkMode && styles.containerDark,
-      {
+      { 
+        backgroundColor: colors.background,
         paddingTop: isWorkActive ? 16 : insets.top,
         paddingBottom: isWorkActive ? 16 : insets.bottom
       }
     ]}>
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Theme</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
         <View style={styles.themeOptions}>
           {themeOptions.map((option) => (
-            <TouchableOpacity
+            <View
               key={option.value}
               style={[
                 styles.themeOption,
-                theme === option.value && styles.themeOptionSelected,
-                isDarkMode && styles.themeOptionDark,
-                theme === option.value && isDarkMode && styles.themeOptionSelectedDark,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                theme === option.value && { backgroundColor: colors.primary }
               ]}
-              onPress={() => setTheme(option.value)}
             >
-              <MaterialIcons
-                name={option.icon as any}
-                size={24}
-                color={theme === option.value ? '#fff' : isDarkMode ? '#fff' : '#000'}
-              />
-              <Text
-                style={[
-                  styles.themeOptionText,
-                  isDarkMode && styles.textDark,
-                  theme === option.value && styles.themeOptionTextSelected,
-                ]}
+              <TouchableOpacity
+                style={styles.themeOptionContent}
+                onPress={() => setTheme(option.value)}
               >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
+                <MaterialIcons
+                  name={option.icon as any}
+                  size={24}
+                  color={theme === option.value ? '#FFFFFF' : colors.text}
+                />
+                <Text
+                  style={[
+                    styles.themeOptionText,
+                    { color: theme === option.value ? '#FFFFFF' : colors.text }
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </View>
       </View>
-      <View style={[styles.settingCard, isDarkMode && styles.settingCardDark]}>
-        <Text style={[styles.settingLabel, isDarkMode && styles.textDark]}>
+      <View style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.settingLabel, { color: colors.text }]}>
           Dark Mode
         </Text>
         <Switch
           value={isDarkMode}
           onValueChange={(value) => setTheme(value ? 'dark' : 'light')}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={isDarkMode ? '#2196F3' : '#f4f3f4'}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={isDarkMode ? colors.accent : colors.surface}
         />
       </View>
-      <View style={[styles.settingCard, isDarkMode && styles.settingCardDark]}>
-        <TouchableOpacity onPress={handleExport} style={styles.importExportButton}>
-          <MaterialIcons name="file-download" size={24} color={isDarkMode ? '#fff' : '#000'} />
-          <Text style={[styles.settingLabel, isDarkMode && styles.textDark]}>Export History</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={[styles.settingCard, isDarkMode && styles.settingCardDark]}>
-        <TouchableOpacity onPress={handleImport} style={styles.importExportButton}>
-          <MaterialIcons name="file-upload" size={24} color={isDarkMode ? '#fff' : '#000'} />
-          <Text style={[styles.settingLabel, isDarkMode && styles.textDark]}>Import History</Text>
-        </TouchableOpacity>
-      </View>
+      
+      <TouchableOpacity
+        onPress={handleExport}
+        style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <MaterialIcons name="file-download" size={24} color={colors.text} />
+        <Text style={[styles.settingLabel, { color: colors.text }]}>Export History</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        onPress={handleImport}
+        style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <MaterialIcons name="file-upload" size={24} color={colors.text} />
+        <Text style={[styles.settingLabel, { color: colors.text }]}>Import History</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -288,10 +326,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#fff',
-  },
-  containerDark: {
-    backgroundColor: '#090A0A',
   },
   section: {
     marginBottom: 24,
@@ -300,62 +334,35 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: '#000',
-  },
-  textDark: {
-    color: '#fff',
   },
   themeOptions: {
     gap: 12,
   },
   themeOption: {
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  themeOptionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
     gap: 12,
-  },
-  themeOptionDark: {
-    backgroundColor: '#2d2d2d',
-    borderColor: '#444',
-    borderWidth: 1,
-  },
-  themeOptionSelected: {
-    backgroundColor: '#2196F3',
-  },
-  themeOptionSelectedDark: {
-    backgroundColor: '#1976D2',
-    borderWidth: 0,
   },
   themeOptionText: {
     fontSize: 16,
-    color: '#000',
-  },
-  themeOptionTextSelected: {
-    color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '500',
   },
   settingCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  settingCardDark: {
-    backgroundColor: '#2d2d2d',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
   },
   settingLabel: {
     fontSize: 16,
-    color: '#000',
-  },
-  importExportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    width: '100%',
+    fontWeight: '500',
   },
 });

@@ -8,6 +8,7 @@ interface JobContextType {
   addJob: (job: Omit<JobEntry, 'id'>) => void;
   updateJob: (id: string, updates: Partial<Omit<JobEntry, 'id'>>) => void;
   updateWorkSession: (id: string, session: Partial<Omit<WorkSession, 'id'>>) => void;
+  deleteSession: (date: string) => void;
   endJob: (id: string) => void;
   getActiveJobs: () => JobEntry[];
   getCompletedJobs: () => JobEntry[];
@@ -220,6 +221,34 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
     workSessions.find(session => session.date === date) || null
   );
 
+  const deleteSession = (date: string) => {
+    // Remove the work session for the specified date
+    setWorkSessions(prev => {
+      const updated = prev.filter(session => session.date !== date);
+      AsyncStorage.setItem(WORK_SESSIONS_STORAGE_KEY, JSON.stringify(updated.map(s => ({
+        ...s,
+        clockIn: s.clockIn.toISOString(),
+        clockOut: s.clockOut ? s.clockOut.toISOString() : null
+      }))));
+      return updated;
+    });
+
+    // Remove all jobs for the specified date
+    setJobs(prev => {
+      const targetDate = new Date(date);
+      const updated = prev.filter(job => {
+        const jobDate = job.startTime.toISOString().split('T')[0];
+        return jobDate !== date;
+      });
+      AsyncStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updated.map(j => ({
+        ...j,
+        startTime: j.startTime.toISOString(),
+        endTime: j.endTime ? j.endTime.toISOString() : null
+      }))));
+      return updated;
+    });
+  };
+
   const clearHistory = () => {
     const activeJobs = jobs.filter(job => !job.endTime);
     setJobs(activeJobs);
@@ -235,6 +264,7 @@ export function JobProvider({ children }: { children: React.ReactNode }) {
       addJob,
       updateJob,
       updateWorkSession,
+      deleteSession,
       endJob,
       getActiveJobs,
       getCompletedJobs,

@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
+
 // Format time helper functions
 const formatTime = (date: Date) => {
   return date.toLocaleTimeString('en-US', {
@@ -79,7 +80,7 @@ const copyToClipboard = async (text: string) => {
 
 export default function ActiveJobsScreen() {
   const { addJob, endJob, getActiveJobs, clockIn, clockOut, getCurrentWorkSession, jobs } = useJobs();
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, colors } = useTheme();
   const [newJob, setNewJob] = useState({ name: '', description: '' });
   const [localJobs, setLocalJobs] = useState<any[]>([]);
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -120,56 +121,49 @@ export default function ActiveJobsScreen() {
   console.log('Render - Local jobs:', localJobs);
 
   return (
-    <View style={[styles.container, isDarkMode && styles.containerDark]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!currentSession || currentSession.clockOut ? (
         <View style={styles.welcomeContainer}>
           <Image 
-            source={isDarkMode 
-              ? require('../../assets/images/auelogo.png') 
-              : require('../../assets/images/auelogowhite.png')}
+            source={require('../../assets/images/productivity.png')}
             style={styles.welcomeImage}
             resizeMode="contain"
           />
-          <View style={[styles.welcomeCard, isDarkMode && styles.welcomeCardDark]}>
-            <Text style={[styles.copyrightText, isDarkMode && styles.textDark]}>
-              © 2025 DailyReport | Created by Kevin Calvin Naeem
+          <View style={[styles.welcomeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.welcomeTitle, { color: colors.text }]}>
+              Welcome to Daily Report
             </Text>
-            <Text style={[styles.welcomeTitle, isDarkMode && styles.textDark]}>
-              Welcome to DailyReport
-            </Text>
-            <Text style={[styles.welcomeSubtitle, isDarkMode && styles.textDark]}>
-              Click Start Work Day to track your working hours
+            <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
+              Track your work hours and manage your daily tasks efficiently
             </Text>
             <TouchableOpacity
-              style={[styles.sessionButton, styles.startSessionButton]}
+              style={[styles.startSessionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               onPress={() => {
                 clockIn();
                 setForceUpdate(prev => prev + 1);
               }}
             >
-              <Text style={styles.sessionButtonText}>Start Work Day</Text>
+              <Text style={[styles.startSessionButtonText, { color: '#FFFFFF' }]}>Start Work Day</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.welcomeNavButtons}>
             <TouchableOpacity
-              style={[styles.navButton, isDarkMode && styles.navButtonDark]}
+              style={[styles.navButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={() => router.push('/history')}
             >
-              <MaterialIcons name="history" size={24} color={isDarkMode ? '#fff' : '#2196F3'} />
-              <Text style={[styles.navButtonText, isDarkMode && styles.navButtonTextDark]}>History</Text>
+              <Text style={[styles.navButtonText, { color: colors.primary }]}>History</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.navButton, isDarkMode && styles.navButtonDark]}
+              style={[styles.navButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={() => router.push('/settings')}
             >
-              <MaterialIcons name="settings" size={24} color={isDarkMode ? '#fff' : '#2196F3'} />
-              <Text style={[styles.navButtonText, isDarkMode && styles.navButtonTextDark]}>Settings</Text>
+              <Text style={[styles.navButtonText, { color: colors.primary }]}>Settings</Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <>
-          <View style={[styles.workSessionContainer, isDarkMode && styles.workSessionContainerDark]}>
+          <View style={[styles.workSessionContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               style={styles.workDurationContainer}
               onPress={() => {
@@ -179,48 +173,56 @@ export default function ActiveJobsScreen() {
                 }
               }}
             >
-              <Text style={[styles.workDurationText, isDarkMode && styles.textDark]}>
+              <Text style={[styles.workDurationText, { color: colors.text }]}>
                 {currentSession ? formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs) : 'No active session'}
               </Text>
               <MaterialIcons 
                 name="content-copy" 
                 size={20} 
-                color={isDarkMode ? '#fff' : '#666'} 
+                color={colors.primary} 
               />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.sessionButton, styles.endSessionButton]}
+              style={[styles.endSessionButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
               onPress={() => {
                 clockOut();
                 setForceUpdate(prev => prev + 1);
               }}
             >
-              <Text style={styles.sessionButtonText}>End Work Day</Text>
+              <Text style={[styles.endSessionButtonText, { color: colors.error }]}>End Work Day</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.content}>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <TextInput
-                style={[styles.input, isDarkMode && styles.inputDark]}
+                style={[styles.input, { 
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text
+                }]}
                 placeholder="Job Name"
-                placeholderTextColor={isDarkMode ? '#888' : '#666'}
+                placeholderTextColor={colors.textTertiary}
                 value={newJob.name}
                 onChangeText={(text) => setNewJob(prev => ({ ...prev, name: text }))}
               />
               <TextInput
-                style={[styles.input, isDarkMode && styles.inputDark]}
+                style={[styles.input, { 
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text
+                }]}
                 placeholder="Job Description"
-                placeholderTextColor={isDarkMode ? '#888' : '#666'}
+                placeholderTextColor={colors.textTertiary}
                 value={newJob.description}
                 onChangeText={(text) => setNewJob(prev => ({ ...prev, description: text }))}
                 multiline
               />
-              <TouchableOpacity 
-                style={[styles.startJobButton, isDarkMode && styles.startJobButtonDark]}
+              <TouchableOpacity
+                style={[styles.startJobButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
                 onPress={startNewJob}
               >
-                <Text style={styles.startJobButtonText}>Start New Job</Text>
+                <Text style={[styles.startJobButtonText, { color: '#FFFFFF' }]}>Start New Job</Text>
               </TouchableOpacity>
             </View>
 
@@ -228,28 +230,28 @@ export default function ActiveJobsScreen() {
               {localJobs.map(job => (
                 <View
                   key={job.id}
-                  style={[styles.jobCard, isDarkMode && styles.jobCardDark]}
+                  style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <Text style={[styles.jobName, isDarkMode && styles.textDark]}>{job.name}</Text>
-                  <Text style={[styles.description, isDarkMode && styles.descriptionDark]}>
+                  <Text style={[styles.jobName, { color: colors.text }]}>{job.name}</Text>
+                  <Text style={[styles.description, { color: colors.textSecondary }]}>
                     {job.description}
                   </Text>
-                  <Text style={[styles.timeText, isDarkMode && styles.textDark]}>
+                  <Text style={[styles.timeText, { color: colors.textSecondary }]}>
                     Started: {formatTime(job.startTime)}
                   </Text>
-                  <TouchableOpacity 
-                    style={styles.endButton}
+                  <TouchableOpacity
+                    style={[styles.endButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                     onPress={() => {
                       endJob(job.id);
                       setForceUpdate(prev => prev + 1);
                     }}
                   >
-                    <Text style={styles.endButtonText}>End Job</Text>
+                    <Text style={[styles.endButtonText, { color: colors.error }]}>End Job</Text>
                   </TouchableOpacity>
                 </View>
               ))}
               {localJobs.length === 0 && (
-                <Text style={[styles.emptyState, isDarkMode && styles.textDark]}>
+                <Text style={[styles.emptyState, { color: colors.textTertiary }]}>
                   No active jobs
                 </Text>
               )}
@@ -264,141 +266,103 @@ export default function ActiveJobsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAF9',
     padding: 16,
-  },
-  containerDark: {
-    backgroundColor: '#090a0a',
   },
   content: {
     flex: 1,
   },
   workSessionContainer: {
-    backgroundColor: '#C7C7C7',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 16,
-  },
-  workSessionContainerDark: {
-    backgroundColor: '#2d2d2d',
   },
   inputContainer: {
-    gap: 8,
+    gap: 12,
     marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 8,
-    backgroundColor: '#fff',
-  },
-  inputDark: {
-    borderColor: '#444',
-    backgroundColor: '#2d2d2d',
-    color: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
   },
   jobList: {
     flex: 1,
   },
   jobCard: {
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  jobCardDark: {
-    backgroundColor: '#2d2d2d',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
   },
   jobName: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
-    color: '#000',
   },
   description: {
-    color: '#666',
     marginBottom: 8,
-  },
-  descriptionDark: {
-    color: '#aaa',
+    fontSize: 14,
   },
   timeText: {
-    color: '#333',
-  },
-  textDark: {
-    color: '#fff',
-  },
-  sessionButton: {
-    padding: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  startSessionButton: {
-    backgroundColor: '#4CAF50',
-  },
-  endSessionButton: {
-    backgroundColor: '#FF9800',
-  },
-  sessionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
   },
   startJobButton: {
-    backgroundColor: '#2196F3',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
   },
-  startJobButtonDark: {
-    backgroundColor: '#1976D2',
-  },
   startJobButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  endSessionButton: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  endSessionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   endButton: {
-    backgroundColor: '#ff4444',
     padding: 8,
-    borderRadius: 4,
+    borderRadius: 8,
+    borderWidth: 1,
     marginTop: 8,
     alignItems: 'center',
   },
   endButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     textAlign: 'center',
     marginTop: 40,
-    color: '#666',
     fontSize: 16,
   },
   copyrightText: {
     fontSize: 9,
     textAlign: 'center',
     marginBottom: 16,
-    color: '#666',
   },
   welcomeTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#000',
   },
   welcomeSubtitle: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
-    color: '#666',
   },
   welcomeImage: {
     width: '90%',
@@ -412,19 +376,28 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   welcomeCard: {
-    backgroundColor: '#f5f5f5',
     padding: 24,
-    borderRadius: 16,
+    borderRadius: 20,
+    borderWidth: 1,
     width: '100%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  welcomeCardDark: {
-    backgroundColor: '#2d2d2d',
+  welcomeIcon: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+  },
+  startSessionButton: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 16,
+    width: '100%',
+  },
+  startSessionButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   welcomeNavButtons: {
     flexDirection: 'row',
@@ -434,23 +407,16 @@ const styles = StyleSheet.create({
   navButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D7D7D7',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
     gap: 8,
     minWidth: 120,
     justifyContent: 'center',
   },
-  navButtonDark: {
-    backgroundColor: '#2d2d2d',
-  },
   navButtonText: {
-    color: '#2196F3',
     fontSize: 16,
     fontWeight: '500',
-  },
-  navButtonTextDark: {
-    color: '#fff',
   },
   workTimeDisplay: {
     flexDirection: 'row',
@@ -458,14 +424,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
     marginBottom: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   workTimeText: {
     fontSize: 16,
     fontWeight: '500',
     marginRight: 8,
-    color: '#000',
   },
   workDurationContainer: {
     flexDirection: 'row',
@@ -473,12 +437,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     marginBottom: 12,
-    backgroundColor: 'transparent',
     gap: 8,
   },
   workDurationText: {
     fontSize: 16,
-    color: '#333',
     fontWeight: '500',
   },
 });
