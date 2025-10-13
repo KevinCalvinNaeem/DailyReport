@@ -8,13 +8,16 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  Platform
+  Platform,
+  Modal
 } from 'react-native';
-import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useJobs } from '../../context/JobContext';
+import { useSettings } from '../../context/SettingsContext';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { BlurView } from 'expo-blur';
 
 
 // Format time helper functions
@@ -78,12 +81,63 @@ const copyToClipboard = async (text: string) => {
   }
 };
 
+// Calculate remaining time based on expected work hours
+const calculateRemainingTime = (clockIn: Date, currentTime: Date, expectedHours: number) => {
+  const workedMs = currentTime.getTime() - clockIn.getTime();
+  const workedHours = workedMs / (1000 * 60 * 60);
+  const remainingHours = Math.max(0, expectedHours - workedHours);
+  
+  const hours = Math.floor(remainingHours);
+  const minutes = Math.floor((remainingHours % 1) * 60);
+  
+  if (remainingHours <= 0) {
+    return 'Completed!';
+  }
+  
+  return `${hours}h ${minutes}m`;
+};
+
+// Check if encouragement should be shown (when 1 hour or less remaining)
+const shouldShowEncouragement = (clockIn: Date, currentTime: Date, expectedHours: number) => {
+  const workedMs = currentTime.getTime() - clockIn.getTime();
+  const workedHours = workedMs / (1000 * 60 * 60);
+  const remainingHours = expectedHours - workedHours;
+  
+  return remainingHours > 0 && remainingHours <= 1;
+};
+
+// Calculate hours worked in hh:mm format
+const calculateHoursWorked = (clockIn: Date, currentTime: Date) => {
+  const diff = currentTime.getTime() - clockIn.getTime();
+  
+  // Handle case where diff might be negative or very small (just started)
+  if (diff < 0) {
+    return '00:00';
+  }
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  // Ensure we don't show negative values
+  const safeHours = Math.max(0, hours);
+  const safeMinutes = Math.max(0, minutes);
+  
+  return `${safeHours.toString().padStart(2, '0')}:${safeMinutes.toString().padStart(2, '0')}`;
+};
+
 export default function ActiveJobsScreen() {
-  const { addJob, endJob, getActiveJobs, clockIn, clockOut, getCurrentWorkSession, jobs } = useJobs();
+  const { addJob, endJob, getActiveJobs, clockIn, clockOut, getCurrentWorkSession, jobs, updateJob } = useJobs();
   const { isDarkMode, colors } = useTheme();
-  const [newJob, setNewJob] = useState({ name: '', description: '' });
+  const { expectedWorkHours } = useSettings();
   const [localJobs, setLocalJobs] = useState<any[]>([]);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Modal state
+  const [isJobModalVisible, setIsJobModalVisible] = useState(false);
+  const [modalJob, setModalJob] = useState({ name: '', description: '' });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
 
   const currentSession = getCurrentWorkSession();
 
@@ -94,19 +148,66 @@ export default function ActiveJobsScreen() {
     setLocalJobs(active);
   }, [jobs, currentSession, forceUpdate]);
 
-  const startNewJob = () => {
-    if (newJob.name.trim()) {
-      console.log('Starting new job:', newJob);
-      addJob({
-        name: newJob.name,
-        description: newJob.description,
-        startTime: new Date(),
-        endTime: null
-      });
-      setNewJob({ name: '', description: '' });
-      // Force a re-render
+  // Update current time every minute for live hours tracking
+  useEffect(() => {
+    // Set current time immediately
+    setCurrentTime(new Date());
+    
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update current time when session changes
+  useEffect(() => {
+    if (currentSession) {
+      setCurrentTime(new Date());
+    }
+  }, [currentSession]);
+
+  const openNewJobModal = () => {
+    setIsEditMode(false);
+    setModalJob({ name: '', description: '' });
+    setIsJobModalVisible(true);
+  };
+
+  const openEditJobModal = (job: any) => {
+    setIsEditMode(true);
+    setEditingJobId(job.id);
+    setModalJob({ name: job.name, description: job.description });
+    setIsJobModalVisible(true);
+  };
+
+  const handleModalSave = () => {
+    if (modalJob.name.trim()) {
+      if (isEditMode && editingJobId) {
+        // Update existing job
+        updateJob(editingJobId, {
+          name: modalJob.name,
+          description: modalJob.description
+        });
+      } else {
+        // Create new job
+        console.log('Starting new job:', modalJob);
+        addJob({
+          name: modalJob.name,
+          description: modalJob.description,
+          startTime: new Date(),
+          endTime: null
+        });
+      }
+      closeModal();
       setForceUpdate(prev => prev + 1);
     }
+  };
+
+  const closeModal = () => {
+    setIsJobModalVisible(false);
+    setModalJob({ name: '', description: '' });
+    setIsEditMode(false);
+    setEditingJobId(null);
   };
 
   const copyWorkTime = () => {
@@ -164,24 +265,30 @@ export default function ActiveJobsScreen() {
       ) : (
         <>
           <View style={[styles.workSessionContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity
-              style={styles.workDurationContainer}
-              onPress={() => {
-                if (currentSession?.clockOut) {
-                  const timeText = formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs);
-                  copyToClipboard(timeText);
-                }
-              }}
-            >
-              <Text style={[styles.workDurationText, { color: colors.text }]}>
-                {currentSession ? formatWorkDuration(currentSession.clockIn, currentSession.clockOut, jobs) : 'No active session'}
-              </Text>
-              <MaterialIcons 
-                name="content-copy" 
-                size={20} 
-                color={colors.primary} 
-              />
-            </TouchableOpacity>
+            <View style={styles.timeDisplayContainer}>
+              <View style={styles.hoursWorkedContainer}>
+                <Text style={[styles.hoursWorkedLabel, { color: colors.textSecondary }]}>Hours Worked:</Text>
+                <Text style={[styles.hoursWorkedTime, { color: colors.primary }]}>
+                  {calculateHoursWorked(currentSession.clockIn, currentTime)}
+                </Text>
+              </View>
+              
+              <View style={styles.remainingTimeContainer}>
+                <Text style={[styles.remainingTimeLabel, { color: colors.textSecondary }]}>Remaining:</Text>
+                <Text style={[styles.remainingTimeText, { color: colors.primary }]}>
+                  {calculateRemainingTime(currentSession.clockIn, currentTime, expectedWorkHours)}
+                </Text>
+              </View>
+            </View>
+            
+            {shouldShowEncouragement(currentSession.clockIn, currentTime, expectedWorkHours) && (
+              <View style={styles.encouragementContainer}>
+                <Text style={[styles.encouragementText, { color: colors.primary }]}>
+                  Only 1hr remaining! You're almost there! 🎯
+                </Text>
+              </View>
+            )}
+            
             <TouchableOpacity
               style={[styles.endSessionButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
               onPress={() => {
@@ -194,37 +301,13 @@ export default function ActiveJobsScreen() {
           </View>
 
           <View style={styles.content}>
-            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  color: colors.text
-                }]}
-                placeholder="Job Name"
-                placeholderTextColor={colors.textTertiary}
-                value={newJob.name}
-                onChangeText={(text) => setNewJob(prev => ({ ...prev, name: text }))}
-              />
-              <TextInput
-                style={[styles.input, { 
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  color: colors.text
-                }]}
-                placeholder="Job Description"
-                placeholderTextColor={colors.textTertiary}
-                value={newJob.description}
-                onChangeText={(text) => setNewJob(prev => ({ ...prev, description: text }))}
-                multiline
-              />
-              <TouchableOpacity
-                style={[styles.startJobButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                onPress={startNewJob}
-              >
-                <Text style={[styles.startJobButtonText, { color: '#FFFFFF' }]}>Start New Job</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.newJobButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              onPress={openNewJobModal}
+            >
+              <MaterialIcons name="add" size={24} color="#FFFFFF" />
+              <Text style={[styles.newJobButtonText, { color: '#FFFFFF' }]}>Start New Job</Text>
+            </TouchableOpacity>
 
             <ScrollView style={styles.jobList}>
               {localJobs.map(job => (
@@ -232,10 +315,12 @@ export default function ActiveJobsScreen() {
                   key={job.id}
                   style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <Text style={[styles.jobName, { color: colors.text }]}>{job.name}</Text>
-                  <Text style={[styles.description, { color: colors.textSecondary }]}>
-                    {job.description}
-                  </Text>
+                  <TouchableOpacity onPress={() => openEditJobModal(job)}>
+                    <Text style={[styles.jobName, { color: colors.text }]}>{job.name}</Text>
+                    <Text style={[styles.description, { color: colors.textSecondary }]}>
+                      {job.description}
+                    </Text>
+                  </TouchableOpacity>
                   <Text style={[styles.timeText, { color: colors.textSecondary }]}>
                     Started: {formatTime(job.startTime)}
                   </Text>
@@ -259,6 +344,81 @@ export default function ActiveJobsScreen() {
           </View>
         </>
       )}
+      
+      {/* Job Modal */}
+      <Modal
+        visible={isJobModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <BlurView
+              intensity={20}
+              tint={isDarkMode ? 'dark' : 'light'}
+              style={styles.modalBlur}
+            >
+              <View style={styles.modalContent}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isEditMode ? 'Edit Job' : 'New Job'}
+                </Text>
+                
+                <TextInput
+                  style={[styles.modalInput, { 
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                    color: colors.text
+                  }]}
+                  placeholder="Job Name"
+                  placeholderTextColor={colors.textTertiary}
+                  value={modalJob.name}
+                  onChangeText={(text) => setModalJob(prev => ({ ...prev, name: text }))}
+                  autoFocus
+                />
+                
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextArea, { 
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                    color: colors.text
+                  }]}
+                  placeholder="Job Description"
+                  placeholderTextColor={colors.textTertiary}
+                  value={modalJob.description}
+                  onChangeText={(text) => setModalJob(prev => ({ ...prev, description: text }))}
+                  multiline
+                  numberOfLines={3}
+                />
+                
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      borderColor: colors.border 
+                    }]}
+                    onPress={closeModal}
+                  >
+                    <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalSaveButton, { 
+                      backgroundColor: colors.primary, 
+                      borderColor: colors.primary 
+                    }]}
+                    onPress={handleModalSave}
+                  >
+                    <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                      {isEditMode ? 'Save' : 'Start Job'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </BlurView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -442,5 +602,157 @@ const styles = StyleSheet.create({
   workDurationText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  hoursWorkedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  hoursWorkedLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'right',
+  },
+  hoursWorkedTime: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  timeDisplayContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginVertical: 8,
+    gap: 12,
+  },
+  remainingTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  remainingTimeLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'right',
+  },
+  remainingTimeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  encouragementContainer: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  encouragementText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  editButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  editButton: {
+    flex: 1,
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  saveButton: {
+    // Additional styles can be added here if needed
+  },
+  cancelButton: {
+    // Additional styles can be added here if needed
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  newJobButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 8,
+  },
+  newJobButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  modalBlur: {
+    padding: 24,
+  },
+  modalContent: {
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  modalTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  modalCancelButton: {
+    // Additional styles can be added here if needed
+  },
+  modalSaveButton: {
+    // Additional styles can be added here if needed
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -1,18 +1,24 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, Platform, TextInput } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { useSettings } from '../../context/SettingsContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useJobs } from '../../context/JobContext';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import { GlassAlert } from '../../components/GlassComponents';
 
 
 export default function SettingsScreen() {
   const { theme, setTheme, isDarkMode, colors } = useTheme();
+  const { expectedWorkHours, setExpectedWorkHours } = useSettings();
   const { jobs, workSessions, getCurrentWorkSession, updateJob, updateWorkSession } = useJobs();
   const insets = useSafeAreaInsets();
+  const [workHoursInput, setWorkHoursInput] = useState(expectedWorkHours.toString());
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const themeOptions = [
     { label: 'Light', value: 'light', icon: 'light-mode' },
@@ -22,6 +28,14 @@ export default function SettingsScreen() {
 
   const currentSession = getCurrentWorkSession();
   const isWorkActive = Boolean(currentSession && !currentSession.clockOut);
+
+  const handleWorkHoursChange = (text: string) => {
+    setWorkHoursInput(text);
+    const hours = parseFloat(text);
+    if (!isNaN(hours) && hours > 0 && hours <= 24) {
+      setExpectedWorkHours(hours);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -237,10 +251,11 @@ export default function SettingsScreen() {
           });
         }
         
-        Alert.alert('Success', `History imported successfully: ${importedJobs.length} jobs and ${importedSessions.length} sessions`);
+        setSuccessMessage(`History imported successfully: ${importedJobs.length} jobs and ${importedSessions.length} sessions`);
+        setShowSuccessAlert(true);
       } else {
         console.log('Document picker canceled or no file selected');
-        Alert.alert('Import Canceled', 'No file was selected for import.');
+        // No alert shown when user cancels - this is expected behavior
       }
     } catch (error) {
       console.error('Import error:', error);
@@ -291,6 +306,26 @@ export default function SettingsScreen() {
           ))}
         </View>
       </View>
+      
+      <View style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.settingLabel, { color: colors.text }]}>
+          Expected Work Hours
+        </Text>
+        <TextInput
+          style={[styles.workHoursInput, { 
+            color: colors.text, 
+            borderColor: colors.border,
+            backgroundColor: colors.background
+          }]}
+          value={workHoursInput}
+          onChangeText={handleWorkHoursChange}
+          keyboardType="numeric"
+          placeholder="8"
+          placeholderTextColor={colors.textSecondary}
+          maxLength={4}
+        />
+      </View>
+      
       <View style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.settingLabel, { color: colors.text }]}>
           Dark Mode
@@ -318,6 +353,20 @@ export default function SettingsScreen() {
         <MaterialIcons name="file-upload" size={24} color={colors.text} />
         <Text style={[styles.settingLabel, { color: colors.text }]}>Import History</Text>
       </TouchableOpacity>
+
+      <GlassAlert
+        visible={showSuccessAlert}
+        title="Success"
+        message={successMessage}
+        buttons={[
+          {
+            text: "OK",
+            onPress: () => setShowSuccessAlert(false),
+            style: "default"
+          }
+        ]}
+        onClose={() => setShowSuccessAlert(false)}
+      />
     </View>
   );
 }
@@ -364,5 +413,15 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  workHoursInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    minWidth: 60,
+    maxWidth: 80,
   },
 });

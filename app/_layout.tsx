@@ -1,6 +1,7 @@
 import { Redirect, Stack } from "expo-router";
 import { JobProvider } from "../context/JobContext";
 import { ThemeProvider } from "../context/ThemeContext";
+import { SettingsProvider } from "../context/SettingsContext";
 import { View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,9 +25,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <JobProvider>
-          <RootLayoutContent />
-        </JobProvider>
+        <SettingsProvider>
+          <JobProvider>
+            <RootLayoutContent />
+          </JobProvider>
+        </SettingsProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

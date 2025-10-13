@@ -106,10 +106,10 @@ export default function HistoryScreen() {
       'ongoing';
 
     const textToCopy = 
-      `*Date*: ${dateStr}\n__________________________________\n` +
-      `*In-Time*: ${inTime}\n__________________________________\n` +
-      `${jobsText}\n__________________________________\n` +
-      `*Out-time*: ${outTime}\n__________________________________\n` +
+      `*Date*: ${dateStr}\n-----------------------------------------\n` +
+      `*In-Time*: ${inTime}\n-----------------------------------------\n` +
+      `${jobsText}\n-----------------------------------------\n` +
+      `*Out-time*: ${outTime}\n-----------------------------------------\n` +
       `*Total working hours*: ${totalHours}`;
 
     Clipboard.setString(textToCopy);
