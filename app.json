@@ -2,7 +2,7 @@
   "expo": {
     "name": "DailyReport",
     "slug": "work-hours-tracker",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/DailyReport-icon.png",
     "scheme": "myapp",
