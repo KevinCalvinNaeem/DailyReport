@@ -21,6 +21,7 @@ export default function HistoryScreen() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
   
   // Remove animation refs for instant loading
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -64,17 +65,15 @@ export default function HistoryScreen() {
   };
 
   const getAvailableYears = () => {
-    const years = new Set<number>();
     const currentYear = new Date().getFullYear();
-    years.add(currentYear); // Always include current year
+    const years = [];
     
-    completedJobs.forEach(job => {
-      if (job.endTime) {
-        years.add(new Date(job.endTime).getFullYear());
-      }
-    });
+    // Generate past 10 years (including current year)
+    for (let i = 0; i < 10; i++) {
+      years.push(currentYear - i);
+    }
     
-    return Array.from(years).sort((a, b) => b - a);
+    return years;
   };
 
   const toggleDate = (dateString: string) => {
@@ -643,80 +642,126 @@ export default function HistoryScreen() {
       <Modal
         visible={showFilterModal}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowFilterModal(false)}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowFilterModal(false);
+          setShowYearDropdown(false);
+        }}
       >
         <View style={styles.datePickerModalOverlay}>
           <View style={[styles.datePickerModalContent, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.datePickerModalTitle, { color: colors.text }]}>Select Month & Year</Text>
-            
-            <Text style={[styles.selectorLabel, { color: colors.text }]}>Month</Text>
-            <ScrollView style={styles.monthSelector} showsVerticalScrollIndicator={false}>
-              {monthNames.map((month, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.monthButton,
-                    { backgroundColor: selectedMonth === index ? colors.primary : colors.background },
-                    { borderColor: colors.border }
-                  ]}
-                  onPress={() => setSelectedMonth(index)}
-                >
-                  <Text style={[
-                    styles.monthButtonText,
-                    { color: selectedMonth === index ? colors.background : colors.text }
-                  ]}>
-                    {month}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text style={[styles.selectorLabel, { color: colors.text }]}>Year</Text>
-            <ScrollView style={styles.yearSelector} showsVerticalScrollIndicator={false}>
-              {getAvailableYears().map((year) => (
-                <TouchableOpacity
-                  key={year}
-                  style={[
-                    styles.yearButton,
-                    { backgroundColor: selectedYear === year ? colors.primary : colors.background },
-                    { borderColor: colors.border }
-                  ]}
-                  onPress={() => setSelectedYear(year)}
-                >
-                  <Text style={[
-                    styles.yearButtonText,
-                    { color: selectedYear === year ? colors.background : colors.text }
-                  ]}>
-                    {year}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.datePickerModalButtons}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={[styles.datePickerModalTitle, { color: colors.text }]}>Select Date</Text>
               <TouchableOpacity
-                style={[styles.datePickerResetButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={resetToCurrentMonth}
+                onPress={() => {
+                  setShowFilterModal(false);
+                  setShowYearDropdown(false);
+                }}
+                style={styles.closeButton}
               >
-                <Text style={[styles.resetButtonText, { color: colors.text }]}>Reset to Current Month</Text>
+                <MaterialIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Content */}
+            <View style={styles.modalBody}>
+              {/* Month Selection */}
+              <View style={styles.sectionContainer}>
+                <Text style={[styles.selectorLabel, { color: colors.text }]}>Month</Text>
+                <View style={styles.monthGrid}>
+                  {monthNames.map((month, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.monthChip,
+                        { 
+                          backgroundColor: selectedMonth === index ? colors.primary : colors.background,
+                          borderColor: selectedMonth === index ? colors.primary : colors.border
+                        }
+                      ]}
+                      onPress={() => setSelectedMonth(index)}
+                    >
+                      <Text style={[
+                        styles.monthChipText,
+                        { color: selectedMonth === index ? colors.background : colors.text }
+                      ]}>
+                        {month.substring(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Year Selection */}
+               <View style={[styles.sectionContainer, { zIndex: showYearDropdown ? 1000 : 1 }]}>
+                 <Text style={[styles.selectorLabel, { color: colors.text }]}>Year</Text>
+                 <View style={styles.yearDropdownContainer}>
+                   <TouchableOpacity
+                     style={[styles.yearDropdownButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                     onPress={() => setShowYearDropdown(!showYearDropdown)}
+                   >
+                     <Text style={[styles.yearDropdownText, { color: colors.text }]}>{selectedYear}</Text>
+                     <MaterialIcons 
+                       name={showYearDropdown ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+                       size={24} 
+                       color={colors.text} 
+                     />
+                   </TouchableOpacity>
+                   
+                   {showYearDropdown && (
+                     <View style={[styles.yearDropdownList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                       <ScrollView style={styles.yearScrollView} showsVerticalScrollIndicator={false}>
+                         {getAvailableYears().map((year) => (
+                           <TouchableOpacity
+                             key={year}
+                             style={[
+                               styles.yearOption,
+                               { backgroundColor: selectedYear === year ? colors.primary + '20' : 'transparent' }
+                             ]}
+                             onPress={() => {
+                               setSelectedYear(year);
+                               setShowYearDropdown(false);
+                             }}
+                           >
+                             <Text style={[
+                               styles.yearOptionText,
+                               { color: selectedYear === year ? colors.primary : colors.text }
+                             ]}>
+                               {year}
+                             </Text>
+                           </TouchableOpacity>
+                         ))}
+                       </ScrollView>
+                     </View>
+                   )}
+                 </View>
+               </View>
+            </View>
+
+            {/* Footer */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.resetButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => {
+                  resetToCurrentMonth();
+                  setShowYearDropdown(false);
+                }}
+              >
+                <MaterialIcons name="refresh" size={20} color={colors.text} />
+                <Text style={[styles.resetButtonText, { color: colors.text }]}>Reset</Text>
               </TouchableOpacity>
               
-              <View style={styles.datePickerActionButtons}>
-                <TouchableOpacity
-                  style={[styles.cancelButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                  onPress={() => setShowFilterModal(false)}
-                >
-                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.applyButton, { backgroundColor: colors.primary }]}
-                  onPress={() => setShowFilterModal(false)}
-                >
-                  <Text style={[styles.applyButtonText, { color: colors.background }]}>Apply Filter</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.applyButton, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  setShowFilterModal(false);
+                  setShowYearDropdown(false);
+                }}
+              >
+                <MaterialIcons name="check" size={20} color={colors.background} />
+                <Text style={[styles.applyButtonText, { color: colors.background }]}>Apply</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -966,97 +1011,149 @@ const styles = StyleSheet.create({
   },
   datePickerModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  datePickerModalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 12,
     padding: 20,
   },
+  datePickerModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: 'visible',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
   datePickerModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
+    fontSize: 22,
+    fontWeight: '700',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  sectionContainer: {
+    marginBottom: 24,
   },
   selectorLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  monthSelector: {
-    maxHeight: 120,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  monthButton: {
-    padding: 12,
-    borderBottomWidth: 1,
-    alignItems: 'center',
-  },
-  monthButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  yearSelector: {
-    maxHeight: 120,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  yearButton: {
-    padding: 12,
-    borderBottomWidth: 1,
-    alignItems: 'center',
-  },
-  yearButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  datePickerModalButtons: {
-    marginTop: 20,
-  },
-  datePickerResetButton: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
     marginBottom: 12,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  monthChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    minWidth: 80,
+    alignItems: 'center',
+    flex: 0,
+  },
+  monthChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  yearDropdownContainer: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  yearDropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  yearDropdownText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  yearDropdownList: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    maxHeight: 180,
+    zIndex: 1001,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  yearScrollView: {
+    maxHeight: 200,
+  },
+  yearOption: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  yearOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 20,
+    paddingTop: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 8,
   },
   resetButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-  },
-  datePickerActionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   applyButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
   applyButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 
 });
