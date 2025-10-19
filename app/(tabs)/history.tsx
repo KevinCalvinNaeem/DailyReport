@@ -2,9 +2,10 @@ import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Modal, Tex
 import { useJobs } from '../../context/JobContext';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { JobEntry, WorkSession } from '../../types/job';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { GlassAlert } from '../../components/GlassComponents';
 
@@ -14,8 +15,16 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const completedJobs = getCompletedJobs();
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // Filter states
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  
+  // Remove animation refs for instant loading
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(1)).current;
   const [editingJob, setEditingJob] = useState<JobEntry | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -30,42 +39,51 @@ export default function HistoryScreen() {
   const [showDeleteSessionAlert, setShowDeleteSessionAlert] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
-  const toggleDate = (dateString: string) => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setExpandedDates(prev => 
-        prev.includes(dateString) 
-          ? prev.filter(d => d !== dateString)
-          : [...prev, dateString]
-      );
+  // Month and year helpers
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Filter jobs by selected month and year
+  const filteredJobs = useMemo(() => {
+    return completedJobs.filter(job => {
+      if (!job.endTime) return false;
       
-      if (!expandedDates.includes(dateString)) {
-        fadeAnim.setValue(0);
-        slideAnim.setValue(0);
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
+      const jobDate = new Date(job.endTime);
+      
+      return jobDate.getMonth() === selectedMonth && 
+             jobDate.getFullYear() === selectedYear;
+    });
+  }, [completedJobs, selectedMonth, selectedYear]);
+
+  const resetToCurrentMonth = () => {
+    const now = new Date();
+    setSelectedMonth(now.getMonth());
+    setSelectedYear(now.getFullYear());
+  };
+
+  const getAvailableYears = () => {
+    const years = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear); // Always include current year
+    
+    completedJobs.forEach(job => {
+      if (job.endTime) {
+        years.add(new Date(job.endTime).getFullYear());
       }
     });
+    
+    return Array.from(years).sort((a, b) => b - a);
+  };
+
+  const toggleDate = (dateString: string) => {
+    // Instant toggle without animations for better performance
+    setExpandedDates(prev => 
+      prev.includes(dateString) 
+        ? prev.filter(d => d !== dateString)
+        : [...prev, dateString]
+    );
   };
 
   const handleClearHistory = () => {
@@ -113,7 +131,7 @@ export default function HistoryScreen() {
       `*Total working hours*: ${totalHours}`;
 
     Clipboard.setString(textToCopy);
-    //Alert.alert('Copied', 'Day details copied to clipboard');
+    
   };
 
   const calculateDuration = (start: Date, end: Date) => {
@@ -245,23 +263,41 @@ export default function HistoryScreen() {
     setEditingJob(null);
   };
 
-  const groupedJobs = groupJobsByDate(completedJobs);
+  const groupedJobs = groupJobsByDate(filteredJobs);
 
   return (
     <View style={[
       styles.container, 
       { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }
     ]}>
-      {completedJobs.length > 0 && (
-        <TouchableOpacity
-          style={[styles.clearButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={handleClearHistory}
-        >
-          <Text style={[styles.clearButtonText, { color: colors.error }]}>Clear History</Text>
-        </TouchableOpacity>
-      )}
-
       <ScrollView style={styles.scrollContainer}>
+        {completedJobs.length > 0 && (
+          <TouchableOpacity
+            style={[styles.clearButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={handleClearHistory}
+          >
+            <Text style={[styles.clearButtonText, { color: colors.error }]}>Clear History</Text>
+          </TouchableOpacity>
+        )}
+        
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[styles.filterIconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <MaterialIcons name="calendar-today" size={24} color={colors.primary} />
+            <Text style={[styles.filterButtonLabel, { color: colors.text }]}>
+              {monthNames[selectedMonth]} {selectedYear}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.resetFilterButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={resetToCurrentMonth}
+          >
+            <MaterialIcons name="today" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
         {groupedJobs.map(({ date, jobs }) => {
           const dateStr = date.toISOString().split('T')[0];
           const workSession = getWorkSessionForDate(dateStr);
@@ -311,20 +347,7 @@ export default function HistoryScreen() {
               </View>
 
               {isExpanded && (
-                <Animated.View 
-                  style={[
-                    styles.expandedContent,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0]
-                        })
-                      }]
-                    }
-                  ]}
-                >
+                <View style={styles.expandedContent}>
                   {workSession && (
                     <View style={[styles.timeRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <View style={styles.timeBlock}>
@@ -392,14 +415,19 @@ export default function HistoryScreen() {
                       </View>
                     ))}
                   </View>
-                </Animated.View>
+                </View>
               )}
             </View>
           );
         })}
-        {completedJobs.length === 0 && (
+        {filteredJobs.length === 0 && completedJobs.length === 0 && (
           <Text style={[styles.emptyState, { color: colors.textTertiary }]}>
             No completed jobs yet
+          </Text>
+        )}
+        {filteredJobs.length === 0 && completedJobs.length > 0 && (
+          <Text style={[styles.emptyState, { color: colors.textTertiary }]}>
+            No jobs found for {monthNames[selectedMonth]} {selectedYear}
           </Text>
         )}
       </ScrollView>
@@ -611,6 +639,88 @@ export default function HistoryScreen() {
           setSessionToDelete(null);
         }}
       />
+
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.datePickerModalOverlay}>
+          <View style={[styles.datePickerModalContent, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.datePickerModalTitle, { color: colors.text }]}>Select Month & Year</Text>
+            
+            <Text style={[styles.selectorLabel, { color: colors.text }]}>Month</Text>
+            <ScrollView style={styles.monthSelector} showsVerticalScrollIndicator={false}>
+              {monthNames.map((month, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.monthButton,
+                    { backgroundColor: selectedMonth === index ? colors.primary : colors.background },
+                    { borderColor: colors.border }
+                  ]}
+                  onPress={() => setSelectedMonth(index)}
+                >
+                  <Text style={[
+                    styles.monthButtonText,
+                    { color: selectedMonth === index ? colors.background : colors.text }
+                  ]}>
+                    {month}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.selectorLabel, { color: colors.text }]}>Year</Text>
+            <ScrollView style={styles.yearSelector} showsVerticalScrollIndicator={false}>
+              {getAvailableYears().map((year) => (
+                <TouchableOpacity
+                  key={year}
+                  style={[
+                    styles.yearButton,
+                    { backgroundColor: selectedYear === year ? colors.primary : colors.background },
+                    { borderColor: colors.border }
+                  ]}
+                  onPress={() => setSelectedYear(year)}
+                >
+                  <Text style={[
+                    styles.yearButtonText,
+                    { color: selectedYear === year ? colors.background : colors.text }
+                  ]}>
+                    {year}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.datePickerModalButtons}>
+              <TouchableOpacity
+                style={[styles.datePickerResetButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={resetToCurrentMonth}
+              >
+                <Text style={[styles.resetButtonText, { color: colors.text }]}>Reset to Current Month</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.datePickerActionButtons}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => setShowFilterModal(false)}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.applyButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowFilterModal(false)}
+                >
+                  <Text style={[styles.applyButtonText, { color: colors.background }]}>Apply Filter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -629,6 +739,34 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    margin: 16,
+    marginTop: 0,
+    gap: 8,
+  },
+  filterIconButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  filterButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resetFilterButton: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 48,
   },
   scrollContainer: {
     flex: 1,
@@ -826,4 +964,99 @@ const styles = StyleSheet.create({
   dateHeaderActions: {
     marginLeft: 8,
   },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerModalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 12,
+    padding: 20,
+  },
+  datePickerModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  selectorLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  monthSelector: {
+    maxHeight: 120,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  monthButton: {
+    padding: 12,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  monthButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  yearSelector: {
+    maxHeight: 120,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  yearButton: {
+    padding: 12,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  yearButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  datePickerModalButtons: {
+    marginTop: 20,
+  },
+  datePickerResetButton: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  resetButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  datePickerActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  applyButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
 });
